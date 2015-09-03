@@ -1,0 +1,19 @@
+{
+    "name": "trm42/cachedecorator",
+    "description": "Magical (as in saves manual work quite a lot) Cache Decorator for Laravel 5. Designed for usage with repositories but easily usable for other uses. If there's enough interest, can be made framework agnostic.",
+    "type": "library",
+    "require": {
+        "illuminate/cache": "^5.1"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^4.8"
+    },
+    "license": "GPLv2",
+    "authors": [
+        {
+            "name": "Matias Mäki",
+            "email": "matias.maki@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable"
+}
