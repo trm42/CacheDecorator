@@ -42,11 +42,11 @@ use \BadMethodCallException;
  * @param   bool    $debug          Defines whether we're logging, how the cache works, listens app.debug as default
  *
  *
- * @todo    Make a package out of this
  * @todo    change method check case insensitive if it's possible everywhere
  * @todo    Add some kind of timer functionality to monitor result and cache speed
  * @todo    How to handle empty returns (maybe config whether to cache empty or not and the placeholder)
- *
+ * @todo    How to live without Laravel 5 dependencies?
+ * @todo    What if the repository parameters are objects? O___O
  */
 abstract class CacheDecorator {
 
@@ -65,6 +65,14 @@ abstract class CacheDecorator {
     protected $tags = false;
 
     protected $debug = false;
+
+    /**
+     * You need to implement this per sub-class.
+     *
+     * @return  string  Name of the repository class. Used for instiating the repository
+     *
+     */
+    abstract public function repository();
 
     /**
      * Constructor, accepts the repository object as parameters
@@ -116,14 +124,6 @@ abstract class CacheDecorator {
         // How do you feel about this?
         $this->debug = Config::get('app.debug');
     }
-
-    /**
-     * You need to implement this per sub-class.
-     *
-     * @return  string  Name of the repository class. Used for instiating the repository
-     *
-     */
-    abstract public function repository();
 
     /**
      * Handles the initiating or setting of the repository
