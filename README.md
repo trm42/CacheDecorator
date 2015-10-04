@@ -1,6 +1,6 @@
-# (Magical) Cache Decorator 
+# (Magical) Cache Decorator for Laravel Repositories
 
-Repositories are really, really cool thing that solves real-world issues and follows the idea of DRY (Don't Repeat Yourself), but making similar classes for repository caching and repeating yourself over and over again for code something like this: 
+Repositories are really, really nice thing that solves real-world issues and follows the idea of DRY (Don't Repeat Yourself), but making similar classes for repository caching and repeating yourself over and over again for code something like this: 
 
 ```PHP
 namespace something\nice;
@@ -101,7 +101,7 @@ Install with composer:
 ```bash
 	composer require trm42/cachedecorator
 ```
-Install the repository_cache.php config file:
+Install the default repository_cache.php config file:
 ```bash
-
+	artisan vendor:publish 
 ```

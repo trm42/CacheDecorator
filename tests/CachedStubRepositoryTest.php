@@ -27,7 +27,7 @@ class CachedStubRepositoryTest extends TestCase
     {
         parent::setUp();
 
-        Cache::flush();
+        \Cache::flush();
 
         $this->repository = new CachedStubRepository(new StubRepository);
         $this->repository->setEnabled(true);
@@ -86,7 +86,7 @@ class CachedStubRepositoryTest extends TestCase
         $this->repository->insert();
 
         // Crude way to flush the cache for the first test
-        Cache::flush();
+        \Cache::flush();
 
         // Get the new results
         $res = $this->repository->all();
