@@ -9,12 +9,11 @@ use PHPUnit_Framework_TestCase as TestCase;
 use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubRepository;
 
-
-
 /**
  * Ensures the StubRepository works as intended
- * @todo Add somekind of support for the Laravel event
- * listener to watch what the Cache does
+ * 
+ * @todo Add somekind of support for the Laravel event listener to watch what the Cache does
+ * 
  * @todo Invent a way to test tag clearing
  *
  *
