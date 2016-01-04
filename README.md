@@ -61,7 +61,9 @@ class CachedUserRepository extends CacheDecorator {
 
 ```
 
-Aand you're set! The Cache Decorator caches every request not in the $excludes array. 
+Aand you're set! The Cache Decorator caches every method call not in the $excludes array. 
+
+*Please note this the current version doesn't support objects as part of the method call. It will be added to v1.0.0.*
 
 If you need something really special handling for some methods you can always override them in the Cached Repository class like this (simple example):
 
