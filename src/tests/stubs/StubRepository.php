@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Repositories\Stubs;
+namespace Trm42\CacheDecorator\Tests\Stubs;
 /**
  * Nothing fancy, just really simple array class to mock repository
  *

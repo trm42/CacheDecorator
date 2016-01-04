@@ -4,7 +4,8 @@ use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 
-use PHPUnit_Framework_TestCase as TestCase;
+//use PHPUnit_Framework_TestCase as TestCase;
+use \TestCase;
 
 use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubRepository;
