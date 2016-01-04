@@ -28,7 +28,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Trm42\\CacheDecorator\\Tests\\": "tests/"
+            "Trm42\\CacheDecorator\\Tests\\": "src/tests/"
         }
     },
     "scripts": {
