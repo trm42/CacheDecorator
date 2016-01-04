@@ -107,3 +107,5 @@ Install the default repository_cache.php config file:
 ```bash
 	artisan vendor:publish 
 ```
+
+*Tested with Laravel 5.1 but should work with Laravel 5.0 at least.*
