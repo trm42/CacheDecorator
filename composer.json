@@ -1,10 +1,14 @@
 {
-    "name": "CacheDecorator",
+    "name": "Trm42/CacheDecorator",
     "description": "Magical (as in saves manual work quite a lot) Cache Decorator for Laravel 5. Designed for usage with repositories but easily usable for other uses. If there's enough interest, can be made framework agnostic.",
     "type": "library",
-    "version": "0.1.0-dev",
+    "version": "0.1.0",
+    "keywords": ["laravel", "cache", "decorator", "repository", "laravel 5"],
     "require": {
-        "illuminate/cache": "^5.0"
+        "illuminate/cache": "~5.0",
+        "illuminate/config": "~5.0",
+        "illuminate/support": "~5.0",
+        "illuminate/log": "~5.0",
     },
     "require-dev": {
         "phpunit/phpunit": "^4.8"
@@ -19,12 +23,12 @@
     "minimum-stability": "stable",
     "autoload": {
         "psr-4": {
-            "Trm42\\": "src/"
+            "Trm42\\CacheDecorator\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Trm42\\": "tests/stubs/"
+            "Trm42\\CacheDecorator\\Tests\\": "tests/"
         }
     },
     "scripts": {
