@@ -10,7 +10,7 @@ class CachedUserRepository {
 	protected $repository;
 	protected $cache;
 
-	__construct(UserRepository $users, Cache $cache) {
+	public function __construct(UserRepository $users, Cache $cache) {
 		$this->repository = $users;
 		$this->cache = $cache;
 	}
