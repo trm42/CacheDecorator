@@ -11,6 +11,8 @@ use Trm42\CacheDecorator\CacheDecorator;
  */
 class CachedStubRepository extends CacheDecorator {
 
+	protected $excludes = ['allWithoutCache', 'insert'];
+
     public function repository()
     {
         return StubRepository::class;
