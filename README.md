@@ -101,7 +101,7 @@ Aaand you're set!
 
 Install with composer:
 ```bash
-	composer require trm42/cachedecorator
+	composer require trm42/cache-decorator
 ```
 Install the default repository_cache.php config file:
 ```bash
