@@ -1,5 +1,5 @@
 {
-    "name": "trm42/cachedecorator",
+    "name": "trm42/cache-decorator",
     "description": "Magical (as in saves manual work quite a lot) Cache Decorator for Laravel 5. Designed for usage with repositories but easily usable for other uses. If there's enough interest, can be made framework agnostic.",
     "type": "library",
     "keywords": ["laravel", "cache", "decorator", "repository", "laravel 5"],
