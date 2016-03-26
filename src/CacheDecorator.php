@@ -82,8 +82,23 @@ abstract class CacheDecorator {
      */
     public function __construct($repository = false)
     {
+        $this->initExcludes();
         $this->initRepository($repository);
         $this->getConfig();
+    }
+
+    /**
+     * Basically adds local methods to the excludes[] list
+     * 
+     * 
+     */
+    protected function initExcludes()
+    {
+        $defaults = [   'repository', 'setTtl', 'setEnabled', 'getConfig', 'initRepository', 
+                        'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache', 
+                        'isMethodCacheable', 'generateCacheKey', 'log',                      ];
+
+        $this->excludes = array_merge($defaults, $this->excludes);
     }
 
     /**
