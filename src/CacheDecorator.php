@@ -300,7 +300,7 @@ abstract class CacheDecorator {
             return false;
         }
 
-        $this->log('Method cacheable');
+        $this->log('Method '.$method.' cacheable');
 
         return true;
     }
