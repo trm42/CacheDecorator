@@ -29,8 +29,8 @@ use \BadMethodCallException;
  * For caching relationships, please make sure you're using eager loading (e.g.
  * Eloquent's with() or load() -methods)
  *
- * @author Matias Mäki <matias.maki@gmail.com>
- * @package App\Repository;
+ * @author  Matias Mäki <matias.maki@gmail.com>
+ * @package Trm42\CacheDecorator;
  *
  * @param   Object  $repository     Repository object
  * @param   int     $ttl            Cache entry TTL in minutes
