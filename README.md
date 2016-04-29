@@ -44,7 +44,6 @@ Cue (Magical) Cache Decorator which handles these things automatically for you w
 namespace My\Repositories;
 
 use Trm42\CacheDecorator\CacheDecorator;
-use My\Entities\User;
 
 class CachedUserRepository extends CacheDecorator {
 	
@@ -54,7 +53,7 @@ class CachedUserRepository extends CacheDecorator {
 
 	public function repository()
 	{
-		return User::class;
+		return UserRepository::class;
 	}
 
 }
@@ -103,9 +102,10 @@ Install with composer:
 ```bash
 	composer require trm42/cache-decorator
 ```
-Install the default repository_cache.php config file:
-```bash
-	artisan vendor:publish 
+
+Copy the default configuration:
+```
+cp vendor/trm42/cache-decorator/config/repository_cache.php ./config/
 ```
 
 *Tested with Laravel 5.1 but should work with Laravel 5.0 at least.*
