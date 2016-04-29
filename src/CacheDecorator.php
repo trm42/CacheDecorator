@@ -33,7 +33,7 @@ use \BadMethodCallException;
  * @package Trm42\CacheDecorator;
  *
  * @param   Object  $repository     Repository object
- * @param   int     $ttl            Cache entry TTL in minutes
+ * @param   mixed   $ttl            Cache entry TTL in minutes or false if skip cache
  * @param   bool    $enabled        To skip or to not to skip the caching, useful for dev envs
  * @param   string  $prefix_key     Beginning of the cache key (like 'users' for user repo)
  * @param   array   $excludes       List of repository that must not be cached (like inserts, setters, etc)
@@ -88,7 +88,7 @@ abstract class CacheDecorator {
     }
 
     /**
-     * Basically adds local methods to the excludes[] list
+     * * Basically adds local methods to the excludes[] list
      * 
      * 
      */
@@ -170,6 +170,7 @@ abstract class CacheDecorator {
     public function __call($method, $arguments)
     {
         $this->log('Starting __call: ', compact('method', 'arguments'));
+        
         if ($this->isMethodCacheable($method)) {
 
             $key = $this->generateCacheKey($method, $arguments);
@@ -177,10 +178,13 @@ abstract class CacheDecorator {
             $res = $this->getCache($key);
 
             if (!$res) {
+
                 $this->log('Cache empty, asking from Repository');
+
                 $res = $this->callMethod($method, $arguments);
 
                 $this->putCache($key, $res);
+
             }
 
         } else {
@@ -234,7 +238,10 @@ abstract class CacheDecorator {
      */
     protected function getCache($key)
     {
-
+        if ($this->ttl === false) {
+            return false;
+        }
+        
         if ($this->tags) {
 
             $this->log('Trying to get cache with tags');
@@ -258,12 +265,18 @@ abstract class CacheDecorator {
      */
     protected function putCache($key, $res)
     {
+        if ($this->ttl === false) { // don't save if ttl is false
+            $this->log('Skipping saving to cache as TTL is set to false');
+            return false;
+        }
+
         if ($this->tags) {
             $this->log('Saving to cache with tags');
             return Cache::tags($this->tags)->put($key, $res, $this->ttl);
         }
 
         $this->log('Saving to cache without tags');
+
         return Cache::put($key, $res, $this->ttl);
     }
 

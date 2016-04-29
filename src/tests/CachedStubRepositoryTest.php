@@ -5,7 +5,7 @@ use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 //use PHPUnit_Framework_TestCase as TestCase;
-use \TestCase;
+//use \TestCase;
 
 use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubRepository;
@@ -210,6 +210,18 @@ class CachedStubRepositoryTest extends TestCase
         $exp = [5];
 
         $this->assertEquals($exp, $res);
+    }
+
+    public function testSetTTLToFalse()
+    {
+        
+        Cache::shouldReceive('get')->never();
+        Cache::shouldReceive('put')->never();
+
+        $this->repository->setTtl(false);
+
+        $res = $this->repository->find(3);
+
     }
 
 }
