@@ -1,6 +1,6 @@
 # (Magical) Cache Decorator for Laravel Repositories
 
-Repositories are really, really nice thing that solves real-world issues and follows the idea of DRY (Don't Repeat Yourself), but making similar classes for repository caching and repeating yourself over and over again for code something like this: 
+Repositories are really, really nice thing that solves real-world issues and follows the idea of DRY (Don't Repeat Yourself), but making similar classes for repository caching and repeating yourself over and over again for code like this: 
 
 ```PHP
 namespace something\nice;
@@ -20,7 +20,12 @@ class CachedUserRepository {
 		if (!$this->cache->has('all')) {
 			$results = $this->repository->all();
 			$this->cache->save('all', $results);
+		} else {
+			$results = $this->cache->get('all');
 		}
+
+		return $results;
+
 	}
 
 	function findByX($x)
@@ -29,10 +34,12 @@ class CachedUserRepository {
 		if (!$this->cache->has($key)) {
 			$results = $this->repository->findByX($x);
 			$this->cache->save($key, $results);
+		} else {
+			$results = $this->cache->get($key);
 		}
+
+		return $results;
 	}
-	
-	// Repeat this for every method in the repository class...
 }
 ```
 
@@ -104,8 +111,8 @@ Install with composer:
 ```
 
 Copy the default configuration:
-```
-cp vendor/trm42/cache-decorator/config/repository_cache.php ./config/
+```bash
+	cp vendor/trm42/cache-decorator/config/repository_cache.php ./config/
 ```
 
 *Tested with Laravel 5.1 but should work with Laravel 5.0 at least.*
