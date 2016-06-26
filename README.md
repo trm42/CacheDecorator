@@ -115,4 +115,4 @@ Copy the default configuration:
 	cp vendor/trm42/cache-decorator/config/repository_cache.php ./config/
 ```
 
-*Tested with Laravel 5.1 but should work with Laravel 5.0 at least.*
+*Tested with Laravel 5.1 and 5.2.*
