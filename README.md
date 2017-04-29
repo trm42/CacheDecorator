@@ -74,31 +74,30 @@ Aand you're set! The Cache Decorator caches every method call not in the $exclud
 If you need something really special handling for some methods you can always override them in the Cached Repository class like this (simple example):
 
 ```PHP
-	public function findByX($x)
-	{
+public function findByX($x)
+{
 
-		$key = $this->generateCacheKey(__FUNCTION__, compact($x));
+	$key = $this->generateCacheKey(__FUNCTION__, compact($x));
 
-		$res = $this->getCache($key);
+	$res = $this->getCache($key);
 
-		if (!$res) {
-			$results = $this->repository->findX($x);
-
-			$this->putCache($key, $results);
-		}
-
-		return $res;
-
+	if (!$res) {
+		$results = $this->repository->findX($x);
+		
+		$this->putCache($key, $results);
 	}
+
+	return $res;
+
+}
 ```
 
 If you happen to use a cache driver that enables you to use cache tags, you can clear the cache automatically when the data changes:
-```
-	// Additional properties to add to the earlier example
-	// with class decoration
-	protected $tag_cleaners = ['create'];
-	protected $tags = ['users'];
-
+```PHP
+// Additional properties to add to the earlier example
+// with class decoration
+protected $tag_cleaners = ['create'];
+protected $tags = ['users'];
 ```
 
 Aaand you're set! 
@@ -107,12 +106,12 @@ Aaand you're set!
 
 Install with composer:
 ```bash
-	composer require trm42/cache-decorator
+composer require trm42/cache-decorator
 ```
 
 Copy the default configuration:
 ```bash
-	cp vendor/trm42/cache-decorator/config/repository_cache.php ./config/
+cp vendor/trm42/cache-decorator/config/repository_cache.php ./config/
 ```
 
 *Tested with Laravel 5.1 and 5.2.*
