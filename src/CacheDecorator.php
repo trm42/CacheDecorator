@@ -12,48 +12,48 @@ use Illuminate\Support\Facades\Log;
 use BadMethodCallException;
 use DateInterval;
 use DateTimeInterface;
+use LogicException;
 
 /**
- * Magical Cache Decorator class for Repositories. Meant to be sub classed.
+ * Magical Cache Decorator class. Meant to be sub classed.
  *
- * Base Cache Decorator class for repositories. Sub class this (e.g.
- * class CachedUserRepository extends CacheDecorator and input repository
- * specific settings as class properties and create the 'repository()' method.
- * That method should return only the name of the repository class.
+ * Base Cache Decorator class for transparently caching method calls on any
+ * decorated object (services, repositories, API clients, query objects, etc.).
+ * Sub class this (e.g. class CachedReportingService extends CacheDecorator) and
+ * either pass an instance to the constructor or override decoratedClass() to
+ * return the FQCN to default-instantiate.
  *
- * This class isn't interested in the implementation of the models or the repository.
+ * If you need to create method specific caching logic, you can create a new
+ * method on the sub-classed decorator class. This class automatically forwards
+ * uncached method calls to the decorated object (@see __call()) and caches the
+ * result, removing the need to write boilerplate caching code for every method.
  *
- * If you need to create repository method specific caching logic, you can create
- * new method to the sub-classed cache class (Like CachedUserRepository->all()) .
- * This class automatically calls repository methods and caches them (@see __call())
- * thus lessening the need to write boilerplate caching code for every repository
- * method.
- *
- * For caching relationships, please make sure you're using eager loading (e.g.
- * Eloquent's with() or load() -methods)
+ * For caching relationships in ORM scenarios, please make sure you're using
+ * eager loading (e.g. Eloquent's with() or load() -methods).
  *
  * @author  Matias Mäki <matias.maki@gmail.com>
  * @package Trm42\CacheDecorator;
  *
- * @property   object                                            $repository     Repository object
+ * @property   object                                            $decorated      Decorated object whose method calls are cached
  * @property   int|false|DateInterval|DateTimeInterface|null    $ttl            Cache entry TTL in seconds (or DateInterval / DateTimeInterface). false to skip cache.
  * @property   bool                                              $enabled        To skip or to not to skip the caching, useful for dev envs
- * @property   string                                            $prefix_key     Beginning of the cache key (like 'users' for user repo)
- * @property   array                                             $excludes       List of repository that must not be cached (like inserts, setters, etc)
+ * @property   string                                            $prefix_key     Beginning of the cache key (like 'users' for a user-related decorator)
+ * @property   array                                             $excludes       List of methods that must not be cached (like inserts, setters, etc)
  * @property   array|false                                       $tag_cleaners   If using Cache implementation that supports tags, list of methods that clears the cache tags (like inserts, updates)
- * @property   array|false                                       $tags           List of caching tags associated with the repository cache (like users, photos)
+ * @property   array|false                                       $tags           List of caching tags associated with the decorator cache (like users, photos)
  * @property   bool                                              $debug          Defines whether we're logging, how the cache works, listens app.debug as default
+ * @property   string                                            $config_key     Config namespace this decorator reads from (default 'cache_decorator')
  *
  *
  * @todo    change method check case insensitive if it's possible everywhere
  * @todo    Add some kind of timer functionality to monitor result and cache speed
  * @todo    How to handle empty returns (maybe config whether to cache empty or not and the placeholder)
  * @todo    How to live without Laravel dependencies?
- * @todo    What if the repository parameters are objects? O___O
+ * @todo    What if the decorated method parameters are objects? O___O
  */
 abstract class CacheDecorator {
 
-    protected $repository;
+    protected $decorated;
 
     protected $ttl;
 
@@ -69,24 +69,30 @@ abstract class CacheDecorator {
 
     protected $debug = false;
 
-    /**
-     * You need to implement this per sub-class.
-     *
-     * @return  string  Name of the repository class. Used for instiating the repository
-     *
-     */
-    abstract public function repository();
+    protected string $config_key = 'cache_decorator';
 
     /**
-     * Constructor, accepts the repository object as parameters
+     * Override to return the FQCN of the class to default-instantiate when no
+     * instance is passed to the constructor. Return null (the default) to
+     * require an instance via the constructor.
      *
-     * @param   object|false  $repository     Repository object if you need to define it
+     * @return  string|null  FQCN of the decorated class, or null
+     */
+    protected function decoratedClass(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Constructor, accepts the decorated object as parameter
+     *
+     * @param   object|false  $decorated     Decorated object if you need to define it
      *
      */
-    public function __construct($repository = false)
+    public function __construct($decorated = false)
     {
         $this->initExcludes();
-        $this->initRepository($repository);
+        $this->initDecorated($decorated);
         $this->getConfig();
     }
 
@@ -96,7 +102,7 @@ abstract class CacheDecorator {
      */
     protected function initExcludes(): void
     {
-        $defaults = [   'repository', 'setTtl', 'setEnabled', 'getConfig', 'initRepository',
+        $defaults = [   'decoratedClass', 'setTtl', 'setEnabled', 'getConfig', 'initDecorated',
                         'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache',
                         'isMethodCacheable', 'generateCacheKey', 'log',                      ];
 
@@ -125,15 +131,15 @@ abstract class CacheDecorator {
 
 
     /**
-     * Reads the config values from repository_cache.* values. Note debug listens app.debug.
+     * Reads the config values from {config_key}.* values. Note debug listens app.debug.
      *
      */
     protected function getConfig(): void
     {
-        $this->ttl = Config::get('repository_cache.ttl');
-        $this->enabled = Config::get('repository_cache.enabled');
+        $this->ttl = Config::get("{$this->config_key}.ttl");
+        $this->enabled = Config::get("{$this->config_key}.enabled");
 
-        if (!Config::get('repository_cache.use_tags')) {
+        if (!Config::get("{$this->config_key}.use_tags")) {
             $this->tags = false;
             $this->tag_cleaners = false;
         }
@@ -143,32 +149,40 @@ abstract class CacheDecorator {
     }
 
     /**
-     * Handles the initiating or setting of the repository
+     * Handles the initiating or setting of the decorated object
      *
-     * @param   object|false    $repository
+     * @param   object|false    $decorated
      */
-    public function initRepository($repository): void
+    public function initDecorated($decorated): void
     {
-        if (!$repository) {
-            $class = $this->repository();
-            $repository = new $class;
+        if (!$decorated) {
+            $class = $this->decoratedClass();
+
+            if (!$class) {
+                throw new LogicException(
+                    'No decorated object provided and decoratedClass() returned null. '
+                    . 'Either pass an instance to the constructor or override decoratedClass().'
+                );
+            }
+
+            $decorated = new $class;
         }
 
-        $this->repository = $repository;
+        $this->decorated = $decorated;
     }
 
     /**
      * This is where the magic happens :)
      *
      * If the method is not declared in the cache decorator class (e.g.
-     * CachedUserRepository), then this checks if it's declared in the actual repository
-     * class AND checks if the method call result can be cached and if there's need for
-     * cache tag clean or not
+     * CachedReportingService), then this checks if it's declared in the
+     * decorated object AND checks if the method call result can be cached and
+     * if there's need for cache tag clean or not.
      *
      * @param   string  $method     Name of the method
      * @param   array   $arguments  Arguments for the method and for generating cache key
      *
-     * @return  mixed   Repository results
+     * @return  mixed   Decorated object's results
      */
     public function __call($method, $arguments)
     {
@@ -182,7 +196,7 @@ abstract class CacheDecorator {
 
             if (!$res) {
 
-                $this->log('Cache empty, asking from Repository');
+                $this->log('Cache empty, asking from decorated object');
 
                 $res = $this->callMethod($method, $arguments);
 
@@ -262,10 +276,10 @@ abstract class CacheDecorator {
     }
 
     /**
-     * Save repository results to cache
+     * Save decorated object's results to cache
      *
      * @param string    $key   Cache key
-     * @param mixed     $res   Repository results
+     * @param mixed     $res   Decorated method results
      *
      * @return bool     Did the save succeed?
      *
@@ -288,21 +302,21 @@ abstract class CacheDecorator {
     }
 
     /**
-     * Method for making calls to the repository
+     * Method for making calls to the decorated object
      *
      * @param   string  $method     Name of the method
      * @param   array   $arguments  Arguments for the method
-     * @return  mixed   What ever the repository method returns
-     * @throws  BadMethodCallException  If the method doesn't exist in the repository
+     * @return  mixed   What ever the decorated method returns
+     * @throws  BadMethodCallException  If the method doesn't exist on the decorated object
      */
     protected function callMethod(string $method, array $arguments)
     {
-        if (method_exists($this->repository, $method)) {
-            $this->log('Calling method from the repository');
-            return call_user_func_array([$this->repository, $method], $arguments);
+        if (method_exists($this->decorated, $method)) {
+            $this->log('Calling method from the decorated object');
+            return call_user_func_array([$this->decorated, $method], $arguments);
         }
 
-        throw new BadMethodCallException("Method '{$method}' does not exist in the repository");
+        throw new BadMethodCallException("Method '{$method}' does not exist in the decorated object");
     }
 
     /**

@@ -1,8 +1,8 @@
 {
     "name": "trm42/cache-decorator",
-    "description": "Magical (as in saves manual work quite a lot) Cache Decorator for Laravel. Designed for usage with repositories but easily usable for other uses. If there's enough interest, can be made framework agnostic.",
+    "description": "Magical (as in saves manual work quite a lot) Cache Decorator for Laravel. Generic decorator that transparently caches method calls on any wrapped object, with a RepositoryCacheDecorator subclass for the original repository-flavored use case.",
     "type": "library",
-    "keywords": ["laravel", "cache", "decorator", "repository", "laravel 12", "laravel 13"],
+    "keywords": ["laravel", "cache", "decorator", "cache-decorator", "repository", "service", "laravel 12", "laravel 13"],
     "require": {
         "php": "^8.2",
         "illuminate/cache": "^12.0 || ^13.0",

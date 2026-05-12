@@ -12,6 +12,10 @@ class ServiceProvider extends BaseServiceProvider {
 	public function boot(): void
 	{
 	    $this->publishes([
+	        __DIR__.'/../config/cache_decorator.php' => config_path('cache_decorator.php'),
+	    ], 'cache-decorator-config');
+
+	    $this->publishes([
 	        __DIR__.'/../config/repository_cache.php' => config_path('repository_cache.php'),
 	    ], 'repository-cache-config');
 	}
