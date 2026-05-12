@@ -1,11 +1,9 @@
 <?php
 
-use Illuminate\Foundation\Testing\WithoutMiddleware;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+namespace Trm42\CacheDecorator\Tests;
 
-use PHPUnit_Framework_TestCase as TestCase;
-
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
 use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
 
 /**
@@ -16,41 +14,29 @@ class StubRepositoryTest extends TestCase
 
     protected $repository;
 
-    public function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
         $this->repository = new StubRepository;
     }
 
-    /**
-     * A basic functional test example.
-     *
-     * @return void
-     */
+    #[Test]
     public function testAll()
     {
         $res = $this->repository->all();
 
-        $exp = [
-            1,
-            2,
-            3,
-            4,
-            5,
-        ];
-
-        $this->assertEquals($exp, $res);
+        $this->assertEquals([1, 2, 3, 4, 5], $res);
     }
 
+    #[Test]
     public function testFind()
     {
         $res = $this->repository->find(3);
 
-        $exp = 4;
-
-        $this->assertEquals($exp, $res);
+        $this->assertEquals(4, $res);
     }
 
+    #[Test]
     public function testDelete()
     {
         $this->repository->delete(2);
@@ -59,25 +45,7 @@ class StubRepositoryTest extends TestCase
             0 => 1,
             1 => 2,
             3 => 4,
-            4 => 5
-            ];
-
-        $res = $this->repository->all();
-
-        $this->assertEquals($exp, $res);
-    }
-
-    public function testInsert()
-    {
-        $this->repository->insert();
-
-        $exp = [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
+            4 => 5,
         ];
 
         $res = $this->repository->all();
@@ -85,6 +53,16 @@ class StubRepositoryTest extends TestCase
         $this->assertEquals($exp, $res);
     }
 
+    #[Test]
+    public function testInsert()
+    {
+        $this->repository->insert();
 
+        $exp = [1, 2, 3, 4, 5, 6];
+
+        $res = $this->repository->all();
+
+        $this->assertEquals($exp, $res);
+    }
 
 }

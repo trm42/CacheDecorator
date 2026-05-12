@@ -1,119 +1,104 @@
 <?php
 
-use Illuminate\Foundation\Testing\WithoutMiddleware;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+namespace Trm42\CacheDecorator\Tests;
 
-//use PHPUnit_Framework_TestCase as TestCase;
-//use \TestCase;
-
-use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
+use Illuminate\Support\Facades\Cache;
+use Orchestra\Testbench\TestCase;
+use PHPUnit\Framework\Attributes\Test;
+use Trm42\CacheDecorator\ServiceProvider;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubRepository;
+use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
 
 /**
- * Ensures the StubRepository works as intended
- * 
+ * Ensures the CachedStubRepository works as intended.
+ *
  * @todo Add somekind of support for the Laravel event listener to watch what the Cache does
- * 
  * @todo Invent a way to test tag clearing
- *
- *
  */
 class CachedStubRepositoryTest extends TestCase
 {
 
     protected $repository;
 
-    public function setUp()
+    protected function getPackageProviders($app)
+    {
+        return [ServiceProvider::class];
+    }
+
+    protected function defineEnvironment($app)
+    {
+        $app['config']->set('cache.default', 'array');
+        $app['config']->set('repository_cache.enabled', true);
+        $app['config']->set('repository_cache.ttl', 300);
+        $app['config']->set('repository_cache.use_tags', false);
+    }
+
+    protected function setUp(): void
     {
         parent::setUp();
 
-        \Cache::flush();
+        Cache::flush();
 
         $this->repository = new CachedStubRepository(new StubRepository);
         $this->repository->setEnabled(true);
-        $this->repository->setTtl(5);
+        $this->repository->setTtl(300);
     }
 
-    /**
-     * A basic functional test example.
-     *
-     * @return void
-     */
+    #[Test]
     public function testAll()
     {
         $res = $this->repository->all();
 
-        $exp = [
-            1,
-            2,
-            3,
-            4,
-            5,
-        ];
+        $exp = [1, 2, 3, 4, 5];
 
         $this->assertEquals($exp, $res);
     }
 
+    #[Test]
     public function testAllWithInsertAndGettingOldResultsBecauseOfCaching()
     {
-        // Refreshed the cache
-        $res = $this->repository->all();
+        // Refresh the cache
+        $this->repository->all();
 
-        // Add to Cache but don't clear cache
+        // Mutate underlying repo but do not clear cache
         $this->repository->insert();
 
-        // Get the old results
+        // Should still get the cached (old) results
         $res = $this->repository->all();
 
-        $exp = [
-            1,
-            2,
-            3,
-            4,
-            5,
-        ];
+        $exp = [1, 2, 3, 4, 5];
 
         $this->assertEquals($exp, $res);
-
     }
 
+    #[Test]
     public function testAllWithInsertAndGettingNewResults()
     {
-        // Refreshed the cache
-        $res = $this->repository->all();
+        // Refresh the cache
+        $this->repository->all();
 
-        // Add to Cache
+        // Mutate underlying repo
         $this->repository->insert();
 
-        // Crude way to flush the cache for the first test
-        \Cache::flush();
+        // Flush the cache so the next call hits the repository again
+        Cache::flush();
 
-        // Get the new results
         $res = $this->repository->all();
 
-        $exp = [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-        ];
+        $exp = [1, 2, 3, 4, 5, 6];
 
         $this->assertEquals($exp, $res);
-
     }
 
+    #[Test]
     public function testFind()
     {
         $res = $this->repository->find(3);
 
-        $exp = 4;
-
-        $this->assertEquals($exp, $res);
+        $this->assertEquals(4, $res);
     }
 
+    #[Test]
     public function testDelete()
     {
         $this->repository->delete(2);
@@ -122,52 +107,40 @@ class CachedStubRepositoryTest extends TestCase
             0 => 1,
             1 => 2,
             3 => 4,
-            4 => 5
-            ];
+            4 => 5,
+        ];
 
         $res = $this->repository->all();
 
         $this->assertEquals($exp, $res);
     }
 
+    #[Test]
     public function testInsert()
     {
         $this->repository->insert();
 
-        $exp = [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-        ];
+        $exp = [1, 2, 3, 4, 5, 6];
 
         $res = $this->repository->all();
 
         $this->assertEquals($exp, $res);
     }
 
-    /**
-     *  @expectedException \BadMethodCallException
-     *
-     */
+    #[Test]
     public function testMissingFunction()
     {
+        $this->expectException(\BadMethodCallException::class);
+
         $this->repository->foobar();
     }
 
+    #[Test]
     public function testExcludeMethod()
     {
         $res1 = $this->repository->allWithoutCache();
 
-        $exp1 = [
-            1,
-            2,
-            3,
-            4,
-            5,
-        ];
+        $exp1 = [1, 2, 3, 4, 5];
 
         $this->assertEquals($exp1, $res1);
 
@@ -178,50 +151,36 @@ class CachedStubRepositoryTest extends TestCase
 
         $res2 = $this->repository->allWithoutCache();
 
-        $exp2 = [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-
-        ];
+        $exp2 = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
         $this->assertEquals($exp2, $res2);
     }
 
+    #[Test]
     public function testArrayAsParameter()
     {
-        $res = $this->repository->findMany([1,4]);
+        $res = $this->repository->findMany([1, 4]);
 
-        $exp = [2, 5];
-
-        $this->assertEquals($exp, $res);
+        $this->assertEquals([2, 5], $res);
     }
 
+    #[Test]
     public function testMultiDimensionalArraysAsParameter()
     {
-        $res = $this->repository->findManyWithout(['with' => [1,4], 'without' => [0, 1]]);
+        $res = $this->repository->findManyWithout(['with' => [1, 4], 'without' => [0, 1]]);
 
-        $exp = [5];
-
-        $this->assertEquals($exp, $res);
+        $this->assertEquals([5], $res);
     }
 
+    #[Test]
     public function testSetTTLToFalse()
     {
-        
         Cache::shouldReceive('get')->never();
         Cache::shouldReceive('put')->never();
 
         $this->repository->setTtl(false);
 
-        $res = $this->repository->find(3);
-
+        $this->repository->find(3);
     }
 
 }
