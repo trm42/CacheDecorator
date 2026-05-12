@@ -4,11 +4,14 @@ namespace Trm42\CacheDecorator;
 
 // At least for now there's a Laravel dependency, if there's need, this can be
 // converted to something more generic
-use \Cache;
-use \Config;
-use \Log;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 
-use \BadMethodCallException;
+use BadMethodCallException;
+use DateInterval;
+use DateTimeInterface;
 
 /**
  * Magical Cache Decorator class for Repositories. Meant to be sub classed.
@@ -32,20 +35,20 @@ use \BadMethodCallException;
  * @author  Matias Mäki <matias.maki@gmail.com>
  * @package Trm42\CacheDecorator;
  *
- * @param   Object  $repository     Repository object
- * @param   mixed   $ttl            Cache entry TTL in minutes or false if skip cache
- * @param   bool    $enabled        To skip or to not to skip the caching, useful for dev envs
- * @param   string  $prefix_key     Beginning of the cache key (like 'users' for user repo)
- * @param   array   $excludes       List of repository that must not be cached (like inserts, setters, etc)
- * @param   array   $tag_cleaners   If using Cache implementation that supports tags, list of methods that clears the cache tags (like inserts, updates)
- * @param   array   $tags           List of caching tags associated with the repository cache (like users, photos)
- * @param   bool    $debug          Defines whether we're logging, how the cache works, listens app.debug as default
+ * @property   object                                            $repository     Repository object
+ * @property   int|false|DateInterval|DateTimeInterface|null    $ttl            Cache entry TTL in seconds (or DateInterval / DateTimeInterface). false to skip cache.
+ * @property   bool                                              $enabled        To skip or to not to skip the caching, useful for dev envs
+ * @property   string                                            $prefix_key     Beginning of the cache key (like 'users' for user repo)
+ * @property   array                                             $excludes       List of repository that must not be cached (like inserts, setters, etc)
+ * @property   array|false                                       $tag_cleaners   If using Cache implementation that supports tags, list of methods that clears the cache tags (like inserts, updates)
+ * @property   array|false                                       $tags           List of caching tags associated with the repository cache (like users, photos)
+ * @property   bool                                              $debug          Defines whether we're logging, how the cache works, listens app.debug as default
  *
  *
  * @todo    change method check case insensitive if it's possible everywhere
  * @todo    Add some kind of timer functionality to monitor result and cache speed
  * @todo    How to handle empty returns (maybe config whether to cache empty or not and the placeholder)
- * @todo    How to live without Laravel 5 dependencies?
+ * @todo    How to live without Laravel dependencies?
  * @todo    What if the repository parameters are objects? O___O
  */
 abstract class CacheDecorator {
@@ -58,7 +61,7 @@ abstract class CacheDecorator {
 
     protected $enabled = true;
 
-    protected $excludes = false;
+    protected $excludes = [];
 
     protected $tag_cleaners = [];
 
@@ -77,7 +80,7 @@ abstract class CacheDecorator {
     /**
      * Constructor, accepts the repository object as parameters
      *
-     * @param   object  $repository     Repository object if you need to define it
+     * @param   object|false  $repository     Repository object if you need to define it
      *
      */
     public function __construct($repository = false)
@@ -88,27 +91,26 @@ abstract class CacheDecorator {
     }
 
     /**
-     * * Basically adds local methods to the excludes[] list
-     * 
-     * 
+     * Basically adds local methods to the excludes[] list
+     *
      */
-    protected function initExcludes()
+    protected function initExcludes(): void
     {
-        $defaults = [   'repository', 'setTtl', 'setEnabled', 'getConfig', 'initRepository', 
-                        'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache', 
+        $defaults = [   'repository', 'setTtl', 'setEnabled', 'getConfig', 'initRepository',
+                        'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache',
                         'isMethodCacheable', 'generateCacheKey', 'log',                      ];
 
-        $this->excludes = array_merge($defaults, $this->excludes);
+        $this->excludes = array_merge($defaults, (array) $this->excludes);
     }
 
     /**
      * Set Cache TTL
      *
-     * @param   int     $minutes    Cache Time-to–live in minutes
+     * @param   int|false|DateInterval|DateTimeInterface|null   $ttl    Cache time-to-live in seconds, or false to skip cache.
      */
-    public function setTtl($minutes)
+    public function setTtl($ttl): void
     {
-        $this->ttl = $minutes;
+        $this->ttl = $ttl;
     }
 
     /**
@@ -116,7 +118,7 @@ abstract class CacheDecorator {
      *
      * @param   bool    $bool   True == enable
      */
-    public function setEnabled($bool)
+    public function setEnabled(bool $bool): void
     {
         $this->enabled = $bool;
     }
@@ -126,25 +128,26 @@ abstract class CacheDecorator {
      * Reads the config values from repository_cache.* values. Note debug listens app.debug.
      *
      */
-    protected function getConfig()
+    protected function getConfig(): void
     {
         $this->ttl = Config::get('repository_cache.ttl');
         $this->enabled = Config::get('repository_cache.enabled');
 
-        if (!\Config::get('repository_cache.use_tags')) {
+        if (!Config::get('repository_cache.use_tags')) {
             $this->tags = false;
             $this->tag_cleaners = false;
         }
 
         // How do you feel about this?
-        $this->debug = Config::get('app.debug');
+        $this->debug = (bool) Config::get('app.debug');
     }
 
     /**
      * Handles the initiating or setting of the repository
      *
+     * @param   object|false    $repository
      */
-    public function initRepository($repository)
+    public function initRepository($repository): void
     {
         if (!$repository) {
             $class = $this->repository();
@@ -163,14 +166,14 @@ abstract class CacheDecorator {
      * cache tag clean or not
      *
      * @param   string  $method     Name of the method
-     * @param   mixed   $arguments  Arguments for the method and for generating cache key
+     * @param   array   $arguments  Arguments for the method and for generating cache key
      *
      * @return  mixed   Repository results
      */
     public function __call($method, $arguments)
     {
         $this->log('Starting __call: ', compact('method', 'arguments'));
-        
+
         if ($this->isMethodCacheable($method)) {
 
             $key = $this->generateCacheKey($method, $arguments);
@@ -207,25 +210,29 @@ abstract class CacheDecorator {
      * @return  bool    True == clear tag cache, False == don't clear
      *
      */
-    protected function doesMethodClearTag($method)
+    protected function doesMethodClearTag(string $method): bool
     {
         if ($this->tag_cleaners &&
                 in_array($method, $this->tag_cleaners)) {
             $this->log('Method clears tags');
             return true;
         }
+
+        return false;
     }
 
     /**
      *  Handles the cache tag clearing if the tags are set, otherwise do nothing
      *
      */
-    protected function clearCacheTag()
+    protected function clearCacheTag(): bool
     {
         if ($this->tags) {
             $this->log('Clearing the Tag Cache');
             return Cache::tags($this->tags)->flush();
         }
+
+        return false;
     }
 
     /**
@@ -236,12 +243,12 @@ abstract class CacheDecorator {
      * @return  mixed   Results from the cache with or without tags or false if not found
      *
      */
-    protected function getCache($key)
+    protected function getCache(string $key)
     {
         if ($this->ttl === false) {
             return false;
         }
-        
+
         if ($this->tags) {
 
             $this->log('Trying to get cache with tags');
@@ -263,7 +270,7 @@ abstract class CacheDecorator {
      * @return bool     Did the save succeed?
      *
      */
-    protected function putCache($key, $res)
+    protected function putCache(string $key, $res): bool
     {
         if ($this->ttl === false) { // don't save if ttl is false
             $this->log('Skipping saving to cache as TTL is set to false');
@@ -272,30 +279,30 @@ abstract class CacheDecorator {
 
         if ($this->tags) {
             $this->log('Saving to cache with tags');
-            return Cache::tags($this->tags)->put($key, $res, $this->ttl);
+            return (bool) Cache::tags($this->tags)->put($key, $res, $this->ttl);
         }
 
         $this->log('Saving to cache without tags');
 
-        return Cache::put($key, $res, $this->ttl);
+        return (bool) Cache::put($key, $res, $this->ttl);
     }
 
     /**
      * Method for making calls to the repository
      *
      * @param   string  $method     Name of the method
-     * @param   mixed   $arguments  Arguments for the method
+     * @param   array   $arguments  Arguments for the method
      * @return  mixed   What ever the repository method returns
      * @throws  BadMethodCallException  If the method doesn't exist in the repository
      */
-    protected function callMethod($method, $arguments)
+    protected function callMethod(string $method, array $arguments)
     {
         if (method_exists($this->repository, $method)) {
             $this->log('Calling method from the repository');
             return call_user_func_array([$this->repository, $method], $arguments);
         }
 
-        Throw new BadMethodCallException("Method '{$method}' does not exist in the repository");
+        throw new BadMethodCallException("Method '{$method}' does not exist in the repository");
     }
 
     /**
@@ -304,7 +311,7 @@ abstract class CacheDecorator {
      * @param   string  $method     Method name
      * @return  bool    True == method is cacheable, false == not
      */
-    protected function isMethodCacheable($method)
+    protected function isMethodCacheable(string $method): bool
     {
         if ($this->excludes && in_array($method, $this->excludes)) {
 
@@ -322,12 +329,12 @@ abstract class CacheDecorator {
      * Used for generating the cache key based on the method and method arguments
      *
      * @param   string  $method  Name of the method to be cached
-     * @param   mixed   $arguments  Arguments for the method
+     * @param   array   $arguments  Arguments for the method
      * @return  string  Cache key as string
      */
-    protected function generateCacheKey($method, $arguments)
+    protected function generateCacheKey(string $method, array $arguments): string
     {
-        $temp_params = array_dot($arguments);
+        $temp_params = Arr::dot($arguments);
         $params = '';
 
         foreach($temp_params as $k => $v) {
@@ -344,9 +351,8 @@ abstract class CacheDecorator {
     /**
      * Simple wrapper around the Log facade to get logging when necessary
      *
-     *
      */
-    protected function log($str, $arr = null)
+    protected function log(string $str, ?array $arr = null): void
     {
         if ($this->debug) {
             if (is_array($arr)) {

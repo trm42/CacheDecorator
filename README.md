@@ -53,8 +53,8 @@ namespace My\Repositories;
 use Trm42\CacheDecorator\CacheDecorator;
 
 class CachedUserRepository extends CacheDecorator {
-	
-	protected $ttl = 5; // cache ttl in minutes
+
+	protected $ttl = 300; // cache ttl in seconds (or a DateInterval / DateTimeInterface)
 	protected $prefix_key = 'users';
 	protected $excludes = ['all']; // these methods are not cached
 
@@ -114,4 +114,12 @@ Copy the default configuration:
 cp vendor/trm42/cache-decorator/config/repository_cache.php ./config/
 ```
 
-*Tested with Laravel 5.1 and 5.2.*
+## Upgrading from Laravel 5.x versions
+
+This release targets Laravel 12 and 13 on PHP 8.2+. A few breaking changes:
+
+- **TTL semantics changed from minutes to seconds** (matching Laravel 5.8+'s `Cache::put` API). Update any `$ttl` property and the `repository_cache.ttl` config value accordingly — e.g. `5` (minutes) becomes `300` (seconds).
+- `$ttl` may now also be a `DateInterval` or `DateTimeInterface`, in addition to `int` and `false` (which still bypasses the cache entirely).
+- Minimum PHP version is 8.2.
+
+*Tested with Laravel 12 and Laravel 13.*
