@@ -4,6 +4,7 @@ namespace Trm42\CacheDecorator\Tests;
 
 use Illuminate\Support\Facades\Cache;
 use Orchestra\Testbench\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Trm42\CacheDecorator\ServiceProvider;
 use Trm42\CacheDecorator\Tests\Stubs\CachedAutoStubService;
@@ -15,7 +16,6 @@ use Trm42\CacheDecorator\Tests\Stubs\StubService;
  */
 class CachedStubServiceTest extends TestCase
 {
-
     protected $service;
 
     protected $inner;
@@ -46,7 +46,7 @@ class CachedStubServiceTest extends TestCase
     }
 
     #[Test]
-    public function testCacheHitOnSecondCall()
+    public function test_cache_hit_on_second_call()
     {
         $first = $this->service->compute(21);
         $second = $this->service->compute(21);
@@ -57,7 +57,7 @@ class CachedStubServiceTest extends TestCase
     }
 
     #[Test]
-    public function testCacheKeysVaryByArgument()
+    public function test_cache_keys_vary_by_argument()
     {
         $this->service->compute(5);
         $this->service->compute(7);
@@ -66,7 +66,7 @@ class CachedStubServiceTest extends TestCase
     }
 
     #[Test]
-    public function testExcludedMethodBypassesCache()
+    public function test_excluded_method_bypasses_cache()
     {
         $this->service->mutate();
         $this->service->mutate();
@@ -76,7 +76,7 @@ class CachedStubServiceTest extends TestCase
     }
 
     #[Test]
-    public function testMissingMethodThrows()
+    public function test_missing_method_throws()
     {
         $this->expectException(\BadMethodCallException::class);
 
@@ -84,18 +84,18 @@ class CachedStubServiceTest extends TestCase
     }
 
     #[Test]
-    public function testSetTTLToFalseBypassesCache()
+    public function test_set_ttl_to_null_bypasses_cache()
     {
         Cache::shouldReceive('get')->never();
         Cache::shouldReceive('put')->never();
 
-        $this->service->setTtl(false);
+        $this->service->setTtl(null);
 
         $this->service->compute(3);
     }
 
     #[Test]
-    public function testNoArgConstructionViaDecoratedClass()
+    public function test_no_arg_construction_via_decorated_class()
     {
         $service = new CachedAutoStubService;
         $service->setTtl(300);
@@ -106,7 +106,7 @@ class CachedStubServiceTest extends TestCase
     }
 
     #[Test]
-    public function testConstructorWithoutInstanceOrDecoratedClassThrows()
+    public function test_constructor_without_instance_or_decorated_class_throws()
     {
         $this->expectException(\LogicException::class);
 
@@ -114,7 +114,7 @@ class CachedStubServiceTest extends TestCase
     }
 
     #[Test]
-    public function testArrayArgumentCaches()
+    public function test_array_argument_caches()
     {
         $this->service->findThing(1);
         $this->service->findThing(1);
@@ -122,4 +122,29 @@ class CachedStubServiceTest extends TestCase
         $this->assertEquals(1, $this->inner->callCount);
     }
 
+    public static function falsyMethodProvider(): array
+    {
+        return [
+            'zero int' => ['returnZero', 0],
+            'empty string' => ['returnEmptyString', ''],
+            'empty array' => ['returnEmptyArray', []],
+            'false bool' => ['returnFalse', false],
+        ];
+    }
+
+    #[Test]
+    #[DataProvider('falsyMethodProvider')]
+    public function test_falsy_return_values_are_cached_not_refetched(string $method, $expected)
+    {
+        $first = $this->service->{$method}();
+        $second = $this->service->{$method}();
+
+        $this->assertSame($expected, $first);
+        $this->assertSame($expected, $second);
+        $this->assertEquals(
+            1,
+            $this->inner->callCount,
+            "Falsy return from {$method}() should round-trip via cache instead of re-invoking the inner service"
+        );
+    }
 }

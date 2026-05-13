@@ -1,14 +1,13 @@
 <?php
 
 namespace Trm42\CacheDecorator\Tests\Stubs;
+
 /**
  * Nothing fancy, just really simple array class to mock repository
- *
- *
  */
-class StubRepository {
-
-    protected $all = [
+class StubRepository
+{
+    protected array $all = [
         1,
         2,
         3,
@@ -16,12 +15,12 @@ class StubRepository {
         5,
     ];
 
-    public function all()
+    public function all(): array
     {
         return $this->all;
     }
 
-    public function find($i)
+    public function find(int $i): int|false
     {
         if ($i < 0 || $i > 19) {
             return false;
@@ -30,38 +29,39 @@ class StubRepository {
         return $this->all[$i];
     }
 
-    public function delete($i)
+    public function delete(int $i): bool
     {
         unset($this->all[$i]);
 
         return true;
     }
 
-    public function insert() {
+    public function insert(): bool
+    {
         $count = count($this->all) - 1;
 
         $last = $this->all[$count];
 
         $this->all[] = $last + 1;
-        //\Log::debug('insert', [$count, $last]);
+
+        // \Log::debug('insert', [$count, $last]);
         return true;
     }
 
     /**
      * For testing how the excludes[] works in practice
-     *
      */
-    public function allWithoutCache()
+    public function allWithoutCache(): array
     {
         return $this->all;
     }
 
-    public function findMany($is = [])
+    public function findMany(array $is = []): array
     {
         $res = [];
 
-        foreach($is as $val) {
-            if(isset($this->all[$val])) {
+        foreach ($is as $val) {
+            if (isset($this->all[$val])) {
                 $res[] = $this->all[$val];
             }
         }
@@ -69,15 +69,15 @@ class StubRepository {
         return $res;
     }
 
-    public function findManyWithout($params = [])
+    public function findManyWithout(array $params = []): array
     {
         $res = [];
 
         $with = $params['with'];
         $without = $params['without'];
 
-        foreach($with as $val) {
-            if(!in_array($val, $without) && isset($this->all[$val]) ) {
+        foreach ($with as $val) {
+            if (! in_array($val, $without) && isset($this->all[$val])) {
                 $res[] = $this->all[$val];
             }
         }
@@ -85,5 +85,4 @@ class StubRepository {
         return $res;
 
     }
-
 }

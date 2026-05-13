@@ -11,7 +11,6 @@ use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
  */
 class StubRepositoryTest extends TestCase
 {
-
     protected $repository;
 
     protected function setUp(): void
@@ -21,7 +20,7 @@ class StubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testAll()
+    public function test_all()
     {
         $res = $this->repository->all();
 
@@ -29,7 +28,7 @@ class StubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testFind()
+    public function test_find()
     {
         $res = $this->repository->find(3);
 
@@ -37,7 +36,7 @@ class StubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testDelete()
+    public function test_delete()
     {
         $this->repository->delete(2);
 
@@ -54,7 +53,7 @@ class StubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testInsert()
+    public function test_insert()
     {
         $this->repository->insert();
 
@@ -64,5 +63,4 @@ class StubRepositoryTest extends TestCase
 
         $this->assertEquals($exp, $res);
     }
-
 }

@@ -88,7 +88,7 @@ public function findByX($x)
 
     $res = $this->getCache($key);
 
-    if (!$res) {
+    if ($res === $this->cacheMiss()) {
         $res = $this->decorated->findX($x);
 
         $this->putCache($key, $res);
@@ -97,6 +97,8 @@ public function findByX($x)
     return $res;
 }
 ```
+
+`getCache()` returns the `cacheMiss()` sentinel (a shared `stdClass` instance) when the entry is absent — comparing with `===` against `cacheMiss()` lets the override round-trip falsy payloads (`0`, `''`, `[]`, `false`, `null`) correctly. Don't use truthiness checks like `if (!$res)`: they would treat a legitimately cached `false`/`0`/`[]` as a miss and refetch on every call.
 
 ### Cache tags
 
@@ -109,7 +111,7 @@ protected $tags = ['reports'];
 
 ## Using with repositories
 
-For repository-flavored use cases the package ships `RepositoryCacheDecorator`, which preserves the original repository API: subclasses implement `repository()` returning the wrapped repository class name, and the instance is exposed as `$this->repository`.
+For repository-flavored use cases the package ships `RepositoryCacheDecorator`. It behaves exactly like `CacheDecorator` but reads its config from the `repository_cache.*` namespace instead of `cache_decorator.*`, so repository caches can be tuned independently of other decorators.
 
 ```PHP
 namespace My\Repositories;
@@ -124,7 +126,7 @@ class CachedUserRepository extends RepositoryCacheDecorator {
     protected $tag_cleaners = ['create'];
     protected $tags = ['users'];
 
-    public function repository()
+    protected function decoratedClass(): ?string
     {
         return UserRepository::class;
     }
@@ -136,8 +138,8 @@ class CachedUserRepository extends RepositoryCacheDecorator {
 
         $res = $this->getCache($key);
 
-        if (!$res) {
-            $res = $this->repository->findX($x);
+        if ($res === $this->cacheMiss()) {
+            $res = $this->decorated->findX($x);
             $this->putCache($key, $res);
         }
 
@@ -145,8 +147,6 @@ class CachedUserRepository extends RepositoryCacheDecorator {
     }
 }
 ```
-
-`RepositoryCacheDecorator` reads its config from the `repository_cache.*` namespace, while the generic `CacheDecorator` reads from `cache_decorator.*`. Both work side-by-side.
 
 ## Install
 
@@ -177,9 +177,23 @@ Environment variables:
 
 ## Upgrading
 
+### From the previous 0.x line
+
+A few breaking changes tightened the public contract:
+
+- **TTL bypass uses `null`, not `false`.** The "skip the cache" sentinel for `$ttl` is now `null`. The property type is `int|DateInterval|DateTimeInterface|null` (default `null`) and `setTtl()` has the same typed signature — replace any `protected $ttl = false;` with `protected $ttl = null;` and any `setTtl(false)` with `setTtl(null)`.
+- **`$tags` and `$tag_cleaners` are plain arrays.** Both default to `[]` (no longer `array|false`). If the cache driver doesn't support tags (or `use_tags` is disabled in config), they are reset to `[]` rather than `false`. Custom subclasses that initialized either property to `false` should switch to `[]`.
+- **Falsy cached values round-trip correctly.** Previously a method returning `0`, `''`, `[]`, or `false` would look like a cache miss and be refetched on every call. `getCache()` now returns a `cacheMiss()` sentinel (a shared `stdClass`) on a true miss, and `__call()` compares with `===` — so falsy results are cached and served from cache as expected. If you wrote a custom method override with `if (!$res)` around `getCache()`, switch it to `if ($res === $this->cacheMiss())` (see the override example above).
+- **The `enabled` flag now actually short-circuits caching.** Setting `$enabled = false` (via the property, `setEnabled(false)`, or `{$config_key}.enabled = false`) now causes `__call()` to forward straight to the decorated object, skipping cache reads, writes, and tag flushing.
+
 ### From the repository-only version
 
-The base class is now generic. If your existing cached repository classes `extends CacheDecorator`, switch them to `extends RepositoryCacheDecorator` — your `repository()` method, the `$this->repository` property in custom overrides, and the `repository_cache.*` config all keep working.
+The base class is now generic and the repository-specific glue has been removed in favor of the generic hooks:
+
+- Replace `extends CacheDecorator` with `extends RepositoryCacheDecorator` if you want to keep reading config from the `repository_cache.*` namespace.
+- Rename your `repository()` method to `decoratedClass()` (return type `?string`). The old `repository()` abstract has been removed.
+- In custom method overrides, replace `$this->repository->…` with `$this->decorated->…`. The `$this->repository` alias has been removed.
+- `initRepository()` has been removed; pass the instance via the constructor, or override `decoratedClass()`.
 
 ```diff
 -use Trm42\CacheDecorator\CacheDecorator;
@@ -187,6 +201,15 @@ The base class is now generic. If your existing cached repository classes `exten
 
 -class CachedUserRepository extends CacheDecorator {
 +class CachedUserRepository extends RepositoryCacheDecorator {
+
+-    public function repository()
++    protected function decoratedClass(): ?string
+     {
+         return UserRepository::class;
+     }
+
+-    $res = $this->repository->findX($x);
++    $res = $this->decorated->findX($x);
 ```
 
 ### From Laravel 5.x versions
@@ -194,7 +217,7 @@ The base class is now generic. If your existing cached repository classes `exten
 This release targets Laravel 12 and 13 on PHP 8.2+. A few breaking changes:
 
 - **TTL semantics changed from minutes to seconds** (matching Laravel 5.8+'s `Cache::put` API). Update any `$ttl` property and the `repository_cache.ttl` config value accordingly — e.g. `5` (minutes) becomes `300` (seconds).
-- `$ttl` may now also be a `DateInterval` or `DateTimeInterface`, in addition to `int` and `false` (which still bypasses the cache entirely).
+- `$ttl` may now also be a `DateInterval` or `DateTimeInterface`, in addition to `int` and `null` (which bypasses the cache entirely).
 - Minimum PHP version is 8.2.
 
 *Tested with Laravel 12 and Laravel 13.*

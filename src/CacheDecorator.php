@@ -4,14 +4,13 @@ namespace Trm42\CacheDecorator;
 
 // At least for now there's a Laravel dependency, if there's need, this can be
 // converted to something more generic
+use BadMethodCallException;
+use DateInterval;
+use DateTimeInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
-
-use BadMethodCallException;
-use DateInterval;
-use DateTimeInterface;
 use LogicException;
 
 /**
@@ -32,18 +31,8 @@ use LogicException;
  * eager loading (e.g. Eloquent's with() or load() -methods).
  *
  * @author  Matias Mäki <matias.maki@gmail.com>
- * @package Trm42\CacheDecorator;
  *
- * @property   object                                            $decorated      Decorated object whose method calls are cached
- * @property   int|false|DateInterval|DateTimeInterface|null    $ttl            Cache entry TTL in seconds (or DateInterval / DateTimeInterface). false to skip cache.
- * @property   bool                                              $enabled        To skip or to not to skip the caching, useful for dev envs
- * @property   string                                            $prefix_key     Beginning of the cache key (like 'users' for a user-related decorator)
- * @property   array                                             $excludes       List of methods that must not be cached (like inserts, setters, etc)
- * @property   array|false                                       $tag_cleaners   If using Cache implementation that supports tags, list of methods that clears the cache tags (like inserts, updates)
- * @property   array|false                                       $tags           List of caching tags associated with the decorator cache (like users, photos)
- * @property   bool                                              $debug          Defines whether we're logging, how the cache works, listens app.debug as default
- * @property   string                                            $config_key     Config namespace this decorator reads from (default 'cache_decorator')
- *
+ * @template TInner of object
  *
  * @todo    change method check case insensitive if it's possible everywhere
  * @todo    Add some kind of timer functionality to monitor result and cache speed
@@ -51,32 +40,64 @@ use LogicException;
  * @todo    How to live without Laravel dependencies?
  * @todo    What if the decorated method parameters are objects? O___O
  */
-abstract class CacheDecorator {
+abstract class CacheDecorator
+{
+    /** @var TInner */
+    protected object $decorated;
 
-    protected $decorated;
+    /** TTL in seconds (or DateInterval / DateTimeInterface). null bypasses both reads and writes. */
+    protected int|DateInterval|DateTimeInterface|null $ttl = null;
 
-    protected $ttl;
+    /** Beginning of the cache key (e.g. 'users' for a user-related decorator). */
+    protected ?string $prefix_key = null;
 
-    protected $prefix_key;
+    protected bool $enabled = true;
 
-    protected $enabled = true;
+    /** @var list<string> */
+    protected array $excludes = [];
 
-    protected $excludes = [];
+    /**
+     * Methods that flush the cache tags after running. Requires a tag-capable cache store.
+     *
+     * @var list<string>
+     */
+    protected array $tag_cleaners = [];
 
-    protected $tag_cleaners = [];
+    /**
+     * Cache tags applied to this decorator's entries. Requires a tag-capable cache store.
+     *
+     * @var list<string>
+     */
+    protected array $tags = [];
 
-    protected $tags = false;
+    protected bool $debug = false;
 
-    protected $debug = false;
-
+    /** Config namespace this decorator reads ttl / enabled / use_tags from. */
     protected string $config_key = 'cache_decorator';
+
+    /** Sentinel used to distinguish true cache misses from stored falsy values. */
+    private static ?object $missMarker = null;
+
+    /**
+     * Returns the shared sentinel object used to represent a cache miss. Using
+     * an object lets callers tell a true miss apart from a legitimately cached
+     * falsy value (`0`, `''`, `[]`, `false`, `null`).
+     */
+    protected function cacheMiss(): object
+    {
+        if (self::$missMarker === null) {
+            self::$missMarker = new \stdClass;
+        }
+
+        return self::$missMarker;
+    }
 
     /**
      * Override to return the FQCN of the class to default-instantiate when no
      * instance is passed to the constructor. Return null (the default) to
      * require an instance via the constructor.
      *
-     * @return  string|null  FQCN of the decorated class, or null
+     * @return class-string<TInner>|null FQCN of the decorated class, or null
      */
     protected function decoratedClass(): ?string
     {
@@ -86,10 +107,9 @@ abstract class CacheDecorator {
     /**
      * Constructor, accepts the decorated object as parameter
      *
-     * @param   object|false  $decorated     Decorated object if you need to define it
-     *
+     * @param  TInner|null  $decorated  Decorated object if you need to define it
      */
-    public function __construct($decorated = false)
+    public function __construct(?object $decorated = null)
     {
         $this->initExcludes();
         $this->initDecorated($decorated);
@@ -98,23 +118,22 @@ abstract class CacheDecorator {
 
     /**
      * Basically adds local methods to the excludes[] list
-     *
      */
     protected function initExcludes(): void
     {
-        $defaults = [   'decoratedClass', 'setTtl', 'setEnabled', 'getConfig', 'initDecorated',
-                        'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache',
-                        'isMethodCacheable', 'generateCacheKey', 'log',                      ];
+        $defaults = ['decoratedClass', 'setTtl', 'setEnabled', 'getConfig', 'initDecorated',
+            'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache',
+            'isMethodCacheable', 'generateCacheKey', 'log', 'cacheMiss',         ];
 
-        $this->excludes = array_merge($defaults, (array) $this->excludes);
+        $this->excludes = array_merge($defaults, $this->excludes);
     }
 
     /**
      * Set Cache TTL
      *
-     * @param   int|false|DateInterval|DateTimeInterface|null   $ttl    Cache time-to-live in seconds, or false to skip cache.
+     * @param  int|DateInterval|DateTimeInterface|null  $ttl  Cache time-to-live in seconds, or null to skip cache.
      */
-    public function setTtl($ttl): void
+    public function setTtl(int|DateInterval|DateTimeInterface|null $ttl): void
     {
         $this->ttl = $ttl;
     }
@@ -122,26 +141,24 @@ abstract class CacheDecorator {
     /**
      * Enable or disable caching
      *
-     * @param   bool    $bool   True == enable
+     * @param  bool  $bool  True == enable
      */
     public function setEnabled(bool $bool): void
     {
         $this->enabled = $bool;
     }
 
-
     /**
      * Reads the config values from {config_key}.* values. Note debug listens app.debug.
-     *
      */
     protected function getConfig(): void
     {
         $this->ttl = Config::get("{$this->config_key}.ttl");
         $this->enabled = Config::get("{$this->config_key}.enabled");
 
-        if (!Config::get("{$this->config_key}.use_tags")) {
-            $this->tags = false;
-            $this->tag_cleaners = false;
+        if (! Config::get("{$this->config_key}.use_tags")) {
+            $this->tags = [];
+            $this->tag_cleaners = [];
         }
 
         // How do you feel about this?
@@ -151,17 +168,17 @@ abstract class CacheDecorator {
     /**
      * Handles the initiating or setting of the decorated object
      *
-     * @param   object|false    $decorated
+     * @param  TInner|null  $decorated
      */
-    public function initDecorated($decorated): void
+    public function initDecorated(?object $decorated): void
     {
-        if (!$decorated) {
+        if ($decorated === null) {
             $class = $this->decoratedClass();
 
-            if (!$class) {
+            if (! $class) {
                 throw new LogicException(
                     'No decorated object provided and decoratedClass() returned null. '
-                    . 'Either pass an instance to the constructor or override decoratedClass().'
+                    .'Either pass an instance to the constructor or override decoratedClass().'
                 );
             }
 
@@ -179,14 +196,19 @@ abstract class CacheDecorator {
      * decorated object AND checks if the method call result can be cached and
      * if there's need for cache tag clean or not.
      *
-     * @param   string  $method     Name of the method
-     * @param   array   $arguments  Arguments for the method and for generating cache key
-     *
-     * @return  mixed   Decorated object's results
+     * @param  string  $method  Name of the method
+     * @param  array<int|string, mixed>  $arguments  Arguments for the method and for generating cache key
+     * @return mixed Decorated object's results
      */
     public function __call($method, $arguments)
     {
         $this->log('Starting __call: ', compact('method', 'arguments'));
+
+        if ($this->enabled === false) {
+            $this->log('Caching disabled, bypassing cache');
+
+            return $this->callMethod($method, $arguments);
+        }
 
         if ($this->isMethodCacheable($method)) {
 
@@ -194,7 +216,7 @@ abstract class CacheDecorator {
 
             $res = $this->getCache($key);
 
-            if (!$res) {
+            if ($res === $this->cacheMiss()) {
 
                 $this->log('Cache empty, asking from decorated object');
 
@@ -219,16 +241,15 @@ abstract class CacheDecorator {
     /**
      * Checks if we need to clear the tag cache
      *
-     * @param  string  $method     Name of the method
-     *
-     * @return  bool    True == clear tag cache, False == don't clear
-     *
+     * @param  string  $method  Name of the method
+     * @return bool True == clear tag cache, False == don't clear
      */
     protected function doesMethodClearTag(string $method): bool
     {
         if ($this->tag_cleaners &&
                 in_array($method, $this->tag_cleaners)) {
             $this->log('Method clears tags');
+
             return true;
         }
 
@@ -237,12 +258,12 @@ abstract class CacheDecorator {
 
     /**
      *  Handles the cache tag clearing if the tags are set, otherwise do nothing
-     *
      */
     protected function clearCacheTag(): bool
     {
         if ($this->tags) {
             $this->log('Clearing the Tag Cache');
+
             return Cache::tags($this->tags)->flush();
         }
 
@@ -252,47 +273,49 @@ abstract class CacheDecorator {
     /**
      * Returns the results from the cache
      *
-     * @param   string  $key    Cache key
-     *
-     * @return  mixed   Results from the cache with or without tags or false if not found
-     *
+     * @param  string  $key  Cache key
+     * @return mixed Results from the cache with or without tags, or the
+     *               cacheMiss() sentinel if the entry is absent (or reads
+     *               are bypassed via ttl === null).
      */
     protected function getCache(string $key)
     {
-        if ($this->ttl === false) {
-            return false;
+        $miss = $this->cacheMiss();
+
+        if ($this->ttl === null) {
+            return $miss;
         }
 
         if ($this->tags) {
 
             $this->log('Trying to get cache with tags');
 
-            return Cache::tags($this->tags)->get($key);
+            return Cache::tags($this->tags)->get($key, $miss);
         }
 
         $this->log('Trying to get cache without tags');
 
-        return Cache::get($key);
+        return Cache::get($key, $miss);
     }
 
     /**
      * Save decorated object's results to cache
      *
-     * @param string    $key   Cache key
-     * @param mixed     $res   Decorated method results
-     *
-     * @return bool     Did the save succeed?
-     *
+     * @param  string  $key  Cache key
+     * @param  mixed  $res  Decorated method results
+     * @return bool Did the save succeed?
      */
     protected function putCache(string $key, $res): bool
     {
-        if ($this->ttl === false) { // don't save if ttl is false
-            $this->log('Skipping saving to cache as TTL is set to false');
+        if ($this->ttl === null) { // don't save if ttl is null
+            $this->log('Skipping saving to cache as TTL is set to null');
+
             return false;
         }
 
         if ($this->tags) {
             $this->log('Saving to cache with tags');
+
             return (bool) Cache::tags($this->tags)->put($key, $res, $this->ttl);
         }
 
@@ -304,16 +327,18 @@ abstract class CacheDecorator {
     /**
      * Method for making calls to the decorated object
      *
-     * @param   string  $method     Name of the method
-     * @param   array   $arguments  Arguments for the method
-     * @return  mixed   What ever the decorated method returns
-     * @throws  BadMethodCallException  If the method doesn't exist on the decorated object
+     * @param  string  $method  Name of the method
+     * @param  array<int|string, mixed>  $arguments  Arguments for the method
+     * @return mixed What ever the decorated method returns
+     *
+     * @throws BadMethodCallException If the method doesn't exist on the decorated object
      */
     protected function callMethod(string $method, array $arguments)
     {
         if (method_exists($this->decorated, $method)) {
             $this->log('Calling method from the decorated object');
-            return call_user_func_array([$this->decorated, $method], $arguments);
+
+            return $this->decorated->{$method}(...$arguments);
         }
 
         throw new BadMethodCallException("Method '{$method}' does not exist in the decorated object");
@@ -322,8 +347,8 @@ abstract class CacheDecorator {
     /**
      * Checks if the method belongs to excludes array or not
      *
-     * @param   string  $method     Method name
-     * @return  bool    True == method is cacheable, false == not
+     * @param  string  $method  Method name
+     * @return bool True == method is cacheable, false == not
      */
     protected function isMethodCacheable(string $method): bool
     {
@@ -342,22 +367,22 @@ abstract class CacheDecorator {
     /**
      * Used for generating the cache key based on the method and method arguments
      *
-     * @param   string  $method  Name of the method to be cached
-     * @param   array   $arguments  Arguments for the method
-     * @return  string  Cache key as string
+     * @param  string  $method  Name of the method to be cached
+     * @param  array<int|string, mixed>  $arguments  Arguments for the method
+     * @return string Cache key as string
      */
     protected function generateCacheKey(string $method, array $arguments): string
     {
         $temp_params = Arr::dot($arguments);
         $params = '';
 
-        foreach($temp_params as $k => $v) {
+        foreach ($temp_params as $k => $v) {
             $params .= ".{$k}={$v}";
         }
 
         $key = "{$this->prefix_key}.{$method}{$params}";
 
-        $this->log('Cache Key: \'' .$key . '\'');
+        $this->log('Cache Key: \''.$key.'\'');
 
         return $key;
     }
@@ -365,6 +390,7 @@ abstract class CacheDecorator {
     /**
      * Simple wrapper around the Log facade to get logging when necessary
      *
+     * @param  array<string, mixed>|null  $arr  Optional context data for the log entry
      */
     protected function log(string $str, ?array $arr = null): void
     {
@@ -376,6 +402,4 @@ abstract class CacheDecorator {
             }
         }
     }
-
-
 }

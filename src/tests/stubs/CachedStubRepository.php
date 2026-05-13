@@ -6,16 +6,14 @@ use Trm42\CacheDecorator\RepositoryCacheDecorator;
 
 /**
  * Nothing fancy, just really simple array class to mock repository
- *
- *
  */
-class CachedStubRepository extends RepositoryCacheDecorator {
+class CachedStubRepository extends RepositoryCacheDecorator
+{
+    protected array $excludes = ['allWithoutCache', 'insert'];
 
-	protected $excludes = ['allWithoutCache', 'insert'];
-
-    public function repository()
+    #[\Override]
+    protected function decoratedClass(): ?string
     {
         return StubRepository::class;
     }
-
 }
