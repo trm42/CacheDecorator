@@ -55,10 +55,10 @@ abstract class CacheDecorator {
     protected array $excludes = [];
 
     /** Methods that flush the cache tags after running. Requires a tag-capable cache store. */
-    protected array|false $tag_cleaners = [];
+    protected array $tag_cleaners = [];
 
     /** Cache tags applied to this decorator's entries. Requires a tag-capable cache store. */
-    protected array|false $tags = false;
+    protected array $tags = [];
 
     protected bool $debug = false;
 
@@ -97,10 +97,10 @@ abstract class CacheDecorator {
     /**
      * Constructor, accepts the decorated object as parameter
      *
-     * @param   object|false  $decorated     Decorated object if you need to define it
+     * @param   ?object  $decorated     Decorated object if you need to define it
      *
      */
-    public function __construct($decorated = false)
+    public function __construct(?object $decorated = null)
     {
         $this->initExcludes();
         $this->initDecorated($decorated);
@@ -151,8 +151,8 @@ abstract class CacheDecorator {
         $this->enabled = Config::get("{$this->config_key}.enabled");
 
         if (!Config::get("{$this->config_key}.use_tags")) {
-            $this->tags = false;
-            $this->tag_cleaners = false;
+            $this->tags = [];
+            $this->tag_cleaners = [];
         }
 
         // How do you feel about this?
@@ -162,11 +162,11 @@ abstract class CacheDecorator {
     /**
      * Handles the initiating or setting of the decorated object
      *
-     * @param   object|false    $decorated
+     * @param   ?object    $decorated
      */
-    public function initDecorated($decorated): void
+    public function initDecorated(?object $decorated): void
     {
-        if (!$decorated) {
+        if ($decorated === null) {
             $class = $this->decoratedClass();
 
             if (!$class) {
