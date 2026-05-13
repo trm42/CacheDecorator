@@ -8,8 +8,8 @@ use Trm42\CacheDecorator\CacheDecorator;
  * Generic CacheDecorator subclass that uses decoratedClass() to default
  * instantiate StubService, allowing no-arg construction.
  */
-class CachedAutoStubService extends CacheDecorator {
-
+class CachedAutoStubService extends CacheDecorator
+{
     protected ?string $prefix_key = 'auto-svc';
 
     #[\Override]
@@ -17,5 +17,4 @@ class CachedAutoStubService extends CacheDecorator {
     {
         return StubService::class;
     }
-
 }

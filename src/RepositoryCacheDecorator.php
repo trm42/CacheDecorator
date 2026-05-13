@@ -22,10 +22,10 @@ namespace Trm42\CacheDecorator;
  *     }
  *
  * @template TInner of object
+ *
  * @extends CacheDecorator<TInner>
  */
-abstract class RepositoryCacheDecorator extends CacheDecorator {
-
+abstract class RepositoryCacheDecorator extends CacheDecorator
+{
     protected string $config_key = 'repository_cache';
-
 }

@@ -1,13 +1,12 @@
 <?php
 
 namespace Trm42\CacheDecorator\Tests\Stubs;
+
 /**
  * Nothing fancy, just really simple array class to mock repository
- *
- *
  */
-class StubRepository {
-
+class StubRepository
+{
     protected array $all = [
         1,
         2,
@@ -44,13 +43,13 @@ class StubRepository {
         $last = $this->all[$count];
 
         $this->all[] = $last + 1;
-        //\Log::debug('insert', [$count, $last]);
+
+        // \Log::debug('insert', [$count, $last]);
         return true;
     }
 
     /**
      * For testing how the excludes[] works in practice
-     *
      */
     public function allWithoutCache(): array
     {
@@ -61,8 +60,8 @@ class StubRepository {
     {
         $res = [];
 
-        foreach($is as $val) {
-            if(isset($this->all[$val])) {
+        foreach ($is as $val) {
+            if (isset($this->all[$val])) {
                 $res[] = $this->all[$val];
             }
         }
@@ -77,8 +76,8 @@ class StubRepository {
         $with = $params['with'];
         $without = $params['without'];
 
-        foreach($with as $val) {
-            if(!in_array($val, $without) && isset($this->all[$val]) ) {
+        foreach ($with as $val) {
+            if (! in_array($val, $without) && isset($this->all[$val])) {
                 $res[] = $this->all[$val];
             }
         }
@@ -86,5 +85,4 @@ class StubRepository {
         return $res;
 
     }
-
 }

@@ -17,7 +17,6 @@ use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
  */
 class CachedStubRepositoryTest extends TestCase
 {
-
     protected $repository;
 
     protected function getPackageProviders($app)
@@ -45,7 +44,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testAll()
+    public function test_all()
     {
         $res = $this->repository->all();
 
@@ -55,7 +54,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testAllWithInsertAndGettingOldResultsBecauseOfCaching()
+    public function test_all_with_insert_and_getting_old_results_because_of_caching()
     {
         // Refresh the cache
         $this->repository->all();
@@ -72,7 +71,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testAllWithInsertAndGettingNewResults()
+    public function test_all_with_insert_and_getting_new_results()
     {
         // Refresh the cache
         $this->repository->all();
@@ -91,7 +90,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testFind()
+    public function test_find()
     {
         $res = $this->repository->find(3);
 
@@ -99,7 +98,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testDelete()
+    public function test_delete()
     {
         $this->repository->delete(2);
 
@@ -116,7 +115,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testInsert()
+    public function test_insert()
     {
         $this->repository->insert();
 
@@ -128,7 +127,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testMissingFunction()
+    public function test_missing_function()
     {
         $this->expectException(\BadMethodCallException::class);
 
@@ -136,7 +135,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testExcludeMethod()
+    public function test_exclude_method()
     {
         $res1 = $this->repository->allWithoutCache();
 
@@ -157,7 +156,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testArrayAsParameter()
+    public function test_array_as_parameter()
     {
         $res = $this->repository->findMany([1, 4]);
 
@@ -165,7 +164,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testMultiDimensionalArraysAsParameter()
+    public function test_multi_dimensional_arrays_as_parameter()
     {
         $res = $this->repository->findManyWithout(['with' => [1, 4], 'without' => [0, 1]]);
 
@@ -173,7 +172,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testSetEnabledFalseBypassesCache()
+    public function test_set_enabled_false_bypasses_cache()
     {
         $this->repository->setEnabled(false);
 
@@ -189,7 +188,7 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testSetTtlToNullSkipsCache()
+    public function test_set_ttl_to_null_skips_cache()
     {
         Cache::shouldReceive('get')->never();
         Cache::shouldReceive('put')->never();
@@ -198,5 +197,4 @@ class CachedStubRepositoryTest extends TestCase
 
         $this->repository->find(3);
     }
-
 }
