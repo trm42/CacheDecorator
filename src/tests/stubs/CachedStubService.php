@@ -10,8 +10,8 @@ use Trm42\CacheDecorator\CacheDecorator;
  */
 class CachedStubService extends CacheDecorator {
 
-    protected $prefix_key = 'svc';
+    protected ?string $prefix_key = 'svc';
 
-    protected $excludes = ['mutate'];
+    protected array $excludes = ['mutate'];
 
 }

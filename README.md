@@ -109,7 +109,7 @@ protected $tags = ['reports'];
 
 ## Using with repositories
 
-For repository-flavored use cases the package ships `RepositoryCacheDecorator`, which preserves the original repository API: subclasses implement `repository()` returning the wrapped repository class name, and the instance is exposed as `$this->repository`.
+For repository-flavored use cases the package ships `RepositoryCacheDecorator`. It behaves exactly like `CacheDecorator` but reads its config from the `repository_cache.*` namespace instead of `cache_decorator.*`, so repository caches can be tuned independently of other decorators.
 
 ```PHP
 namespace My\Repositories;
@@ -124,7 +124,7 @@ class CachedUserRepository extends RepositoryCacheDecorator {
     protected $tag_cleaners = ['create'];
     protected $tags = ['users'];
 
-    public function repository()
+    protected function decoratedClass(): ?string
     {
         return UserRepository::class;
     }
@@ -137,7 +137,7 @@ class CachedUserRepository extends RepositoryCacheDecorator {
         $res = $this->getCache($key);
 
         if (!$res) {
-            $res = $this->repository->findX($x);
+            $res = $this->decorated->findX($x);
             $this->putCache($key, $res);
         }
 
@@ -145,8 +145,6 @@ class CachedUserRepository extends RepositoryCacheDecorator {
     }
 }
 ```
-
-`RepositoryCacheDecorator` reads its config from the `repository_cache.*` namespace, while the generic `CacheDecorator` reads from `cache_decorator.*`. Both work side-by-side.
 
 ## Install
 
@@ -179,7 +177,12 @@ Environment variables:
 
 ### From the repository-only version
 
-The base class is now generic. If your existing cached repository classes `extends CacheDecorator`, switch them to `extends RepositoryCacheDecorator` — your `repository()` method, the `$this->repository` property in custom overrides, and the `repository_cache.*` config all keep working.
+The base class is now generic and the repository-specific glue has been removed in favor of the generic hooks:
+
+- Replace `extends CacheDecorator` with `extends RepositoryCacheDecorator` if you want to keep reading config from the `repository_cache.*` namespace.
+- Rename your `repository()` method to `decoratedClass()` (return type `?string`). The old `repository()` abstract has been removed.
+- In custom method overrides, replace `$this->repository->…` with `$this->decorated->…`. The `$this->repository` alias has been removed.
+- `initRepository()` has been removed; pass the instance via the constructor, or override `decoratedClass()`.
 
 ```diff
 -use Trm42\CacheDecorator\CacheDecorator;
@@ -187,6 +190,15 @@ The base class is now generic. If your existing cached repository classes `exten
 
 -class CachedUserRepository extends CacheDecorator {
 +class CachedUserRepository extends RepositoryCacheDecorator {
+
+-    public function repository()
++    protected function decoratedClass(): ?string
+     {
+         return UserRepository::class;
+     }
+
+-    $res = $this->repository->findX($x);
++    $res = $this->decorated->findX($x);
 ```
 
 ### From Laravel 5.x versions

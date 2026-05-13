@@ -10,7 +10,7 @@ use Trm42\CacheDecorator\CacheDecorator;
  */
 class CachedAutoStubService extends CacheDecorator {
 
-    protected $prefix_key = 'auto-svc';
+    protected ?string $prefix_key = 'auto-svc';
 
     protected function decoratedClass(): ?string
     {

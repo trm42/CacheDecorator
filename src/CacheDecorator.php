@@ -34,17 +34,6 @@ use LogicException;
  * @author  Matias Mäki <matias.maki@gmail.com>
  * @package Trm42\CacheDecorator;
  *
- * @property   object                                            $decorated      Decorated object whose method calls are cached
- * @property   int|false|DateInterval|DateTimeInterface|null    $ttl            Cache entry TTL in seconds (or DateInterval / DateTimeInterface). false to skip cache.
- * @property   bool                                              $enabled        To skip or to not to skip the caching, useful for dev envs
- * @property   string                                            $prefix_key     Beginning of the cache key (like 'users' for a user-related decorator)
- * @property   array                                             $excludes       List of methods that must not be cached (like inserts, setters, etc)
- * @property   array|false                                       $tag_cleaners   If using Cache implementation that supports tags, list of methods that clears the cache tags (like inserts, updates)
- * @property   array|false                                       $tags           List of caching tags associated with the decorator cache (like users, photos)
- * @property   bool                                              $debug          Defines whether we're logging, how the cache works, listens app.debug as default
- * @property   string                                            $config_key     Config namespace this decorator reads from (default 'cache_decorator')
- *
- *
  * @todo    change method check case insensitive if it's possible everywhere
  * @todo    Add some kind of timer functionality to monitor result and cache speed
  * @todo    How to handle empty returns (maybe config whether to cache empty or not and the placeholder)
@@ -53,22 +42,27 @@ use LogicException;
  */
 abstract class CacheDecorator {
 
-    protected $decorated;
+    protected object $decorated;
 
-    protected $ttl;
+    /** TTL in seconds (or DateInterval / DateTimeInterface). false bypasses both reads and writes. */
+    protected int|false|DateInterval|DateTimeInterface|null $ttl = null;
 
-    protected $prefix_key;
+    /** Beginning of the cache key (e.g. 'users' for a user-related decorator). */
+    protected ?string $prefix_key = null;
 
-    protected $enabled = true;
+    protected bool $enabled = true;
 
-    protected $excludes = [];
+    protected array $excludes = [];
 
-    protected $tag_cleaners = [];
+    /** Methods that flush the cache tags after running. Requires a tag-capable cache store. */
+    protected array|false $tag_cleaners = [];
 
-    protected $tags = false;
+    /** Cache tags applied to this decorator's entries. Requires a tag-capable cache store. */
+    protected array|false $tags = false;
 
-    protected $debug = false;
+    protected bool $debug = false;
 
+    /** Config namespace this decorator reads ttl / enabled / use_tags from. */
     protected string $config_key = 'cache_decorator';
 
     /**
