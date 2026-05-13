@@ -88,7 +88,7 @@ public function findByX($x)
 
     $res = $this->getCache($key);
 
-    if (!$res) {
+    if ($res === $this->cacheMiss()) {
         $res = $this->decorated->findX($x);
 
         $this->putCache($key, $res);
@@ -97,6 +97,8 @@ public function findByX($x)
     return $res;
 }
 ```
+
+`getCache()` returns the `cacheMiss()` sentinel (a shared `stdClass` instance) when the entry is absent — comparing with `===` against `cacheMiss()` lets the override round-trip falsy payloads (`0`, `''`, `[]`, `false`, `null`) correctly. Don't use truthiness checks like `if (!$res)`: they would treat a legitimately cached `false`/`0`/`[]` as a miss and refetch on every call.
 
 ### Cache tags
 
@@ -136,7 +138,7 @@ class CachedUserRepository extends RepositoryCacheDecorator {
 
         $res = $this->getCache($key);
 
-        if (!$res) {
+        if ($res === $this->cacheMiss()) {
             $res = $this->decorated->findX($x);
             $this->putCache($key, $res);
         }
@@ -174,6 +176,15 @@ Environment variables:
 | `repository_cache.use_tags`     | `REPOSITORY_CACHE_TAGS`    | `true`  |
 
 ## Upgrading
+
+### From the previous 0.x line
+
+A few breaking changes tightened the public contract:
+
+- **TTL bypass uses `null`, not `false`.** The "skip the cache" sentinel for `$ttl` is now `null`. The property type is `int|DateInterval|DateTimeInterface|null` (default `null`) and `setTtl()` has the same typed signature — replace any `protected $ttl = false;` with `protected $ttl = null;` and any `setTtl(false)` with `setTtl(null)`.
+- **`$tags` and `$tag_cleaners` are plain arrays.** Both default to `[]` (no longer `array|false`). If the cache driver doesn't support tags (or `use_tags` is disabled in config), they are reset to `[]` rather than `false`. Custom subclasses that initialized either property to `false` should switch to `[]`.
+- **Falsy cached values round-trip correctly.** Previously a method returning `0`, `''`, `[]`, or `false` would look like a cache miss and be refetched on every call. `getCache()` now returns a `cacheMiss()` sentinel (a shared `stdClass`) on a true miss, and `__call()` compares with `===` — so falsy results are cached and served from cache as expected. If you wrote a custom method override with `if (!$res)` around `getCache()`, switch it to `if ($res === $this->cacheMiss())` (see the override example above).
+- **The `enabled` flag now actually short-circuits caching.** Setting `$enabled = false` (via the property, `setEnabled(false)`, or `{$config_key}.enabled = false`) now causes `__call()` to forward straight to the decorated object, skipping cache reads, writes, and tag flushing.
 
 ### From the repository-only version
 
