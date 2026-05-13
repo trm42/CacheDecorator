@@ -27,4 +27,28 @@ class StubService {
         return true;
     }
 
+    public function returnZero(): int
+    {
+        $this->callCount++;
+        return 0;
+    }
+
+    public function returnEmptyString(): string
+    {
+        $this->callCount++;
+        return '';
+    }
+
+    public function returnEmptyArray(): array
+    {
+        $this->callCount++;
+        return [];
+    }
+
+    public function returnFalse(): bool
+    {
+        $this->callCount++;
+        return false;
+    }
+
 }

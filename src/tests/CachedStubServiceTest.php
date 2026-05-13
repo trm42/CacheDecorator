@@ -122,4 +122,30 @@ class CachedStubServiceTest extends TestCase
         $this->assertEquals(1, $this->inner->callCount);
     }
 
+    public static function falsyMethodProvider(): array
+    {
+        return [
+            'zero int'     => ['returnZero', 0],
+            'empty string' => ['returnEmptyString', ''],
+            'empty array'  => ['returnEmptyArray', []],
+            'false bool'   => ['returnFalse', false],
+        ];
+    }
+
+    #[Test]
+    #[\PHPUnit\Framework\Attributes\DataProvider('falsyMethodProvider')]
+    public function testFalsyReturnValuesAreCachedNotRefetched(string $method, $expected)
+    {
+        $first = $this->service->{$method}();
+        $second = $this->service->{$method}();
+
+        $this->assertSame($expected, $first);
+        $this->assertSame($expected, $second);
+        $this->assertEquals(
+            1,
+            $this->inner->callCount,
+            "Falsy return from {$method}() should round-trip via cache instead of re-invoking the inner service"
+        );
+    }
+
 }

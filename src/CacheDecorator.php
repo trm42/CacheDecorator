@@ -65,6 +65,23 @@ abstract class CacheDecorator {
     /** Config namespace this decorator reads ttl / enabled / use_tags from. */
     protected string $config_key = 'cache_decorator';
 
+    /** Sentinel used to distinguish true cache misses from stored falsy values. */
+    private static ?object $missMarker = null;
+
+    /**
+     * Returns the shared sentinel object used to represent a cache miss. Using
+     * an object lets callers tell a true miss apart from a legitimately cached
+     * falsy value (`0`, `''`, `[]`, `false`, `null`).
+     */
+    protected function cacheMiss(): object
+    {
+        if (self::$missMarker === null) {
+            self::$missMarker = new \stdClass;
+        }
+
+        return self::$missMarker;
+    }
+
     /**
      * Override to return the FQCN of the class to default-instantiate when no
      * instance is passed to the constructor. Return null (the default) to
@@ -98,7 +115,7 @@ abstract class CacheDecorator {
     {
         $defaults = [   'decoratedClass', 'setTtl', 'setEnabled', 'getConfig', 'initDecorated',
                         'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache',
-                        'isMethodCacheable', 'generateCacheKey', 'log',                      ];
+                        'isMethodCacheable', 'generateCacheKey', 'log', 'cacheMiss',         ];
 
         $this->excludes = array_merge($defaults, (array) $this->excludes);
     }
@@ -188,7 +205,7 @@ abstract class CacheDecorator {
 
             $res = $this->getCache($key);
 
-            if (!$res) {
+            if ($res === $this->cacheMiss()) {
 
                 $this->log('Cache empty, asking from decorated object');
 
@@ -248,25 +265,29 @@ abstract class CacheDecorator {
      *
      * @param   string  $key    Cache key
      *
-     * @return  mixed   Results from the cache with or without tags or false if not found
+     * @return  mixed   Results from the cache with or without tags, or the
+     *                  cacheMiss() sentinel if the entry is absent (or reads
+     *                  are bypassed via ttl === false).
      *
      */
     protected function getCache(string $key)
     {
+        $miss = $this->cacheMiss();
+
         if ($this->ttl === false) {
-            return false;
+            return $miss;
         }
 
         if ($this->tags) {
 
             $this->log('Trying to get cache with tags');
 
-            return Cache::tags($this->tags)->get($key);
+            return Cache::tags($this->tags)->get($key, $miss);
         }
 
         $this->log('Trying to get cache without tags');
 
-        return Cache::get($key);
+        return Cache::get($key, $miss);
     }
 
     /**
