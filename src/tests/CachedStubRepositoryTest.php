@@ -173,6 +173,22 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
+    public function testSetEnabledFalseBypassesCache()
+    {
+        $this->repository->setEnabled(false);
+
+        $first = $this->repository->all();
+        $this->assertEquals([1, 2, 3, 4, 5], $first);
+
+        // Mutate the underlying repo; with caching disabled the next call
+        // should reflect the mutation (i.e. the decorated object was hit again).
+        $this->repository->insert();
+
+        $second = $this->repository->all();
+        $this->assertEquals([1, 2, 3, 4, 5, 6], $second);
+    }
+
+    #[Test]
     public function testSetTTLToFalse()
     {
         Cache::shouldReceive('get')->never();

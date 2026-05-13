@@ -199,6 +199,11 @@ abstract class CacheDecorator {
     {
         $this->log('Starting __call: ', compact('method', 'arguments'));
 
+        if ($this->enabled === false) {
+            $this->log('Caching disabled, bypassing cache');
+            return $this->callMethod($method, $arguments);
+        }
+
         if ($this->isMethodCacheable($method)) {
 
             $key = $this->generateCacheKey($method, $arguments);
