@@ -20,6 +20,9 @@ namespace Trm42\CacheDecorator;
  *             return UserRepository::class;
  *         }
  *     }
+ *
+ * @template TInner of object
+ * @extends CacheDecorator<TInner>
  */
 abstract class RepositoryCacheDecorator extends CacheDecorator {
 

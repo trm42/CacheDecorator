@@ -34,6 +34,8 @@ use LogicException;
  * @author  Matias Mäki <matias.maki@gmail.com>
  * @package Trm42\CacheDecorator;
  *
+ * @template TInner of object
+ *
  * @todo    change method check case insensitive if it's possible everywhere
  * @todo    Add some kind of timer functionality to monitor result and cache speed
  * @todo    How to handle empty returns (maybe config whether to cache empty or not and the placeholder)
@@ -42,6 +44,7 @@ use LogicException;
  */
 abstract class CacheDecorator {
 
+    /** @var TInner */
     protected object $decorated;
 
     /** TTL in seconds (or DateInterval / DateTimeInterface). null bypasses both reads and writes. */
@@ -87,7 +90,7 @@ abstract class CacheDecorator {
      * instance is passed to the constructor. Return null (the default) to
      * require an instance via the constructor.
      *
-     * @return  string|null  FQCN of the decorated class, or null
+     * @return  class-string<TInner>|null  FQCN of the decorated class, or null
      */
     protected function decoratedClass(): ?string
     {
@@ -97,7 +100,7 @@ abstract class CacheDecorator {
     /**
      * Constructor, accepts the decorated object as parameter
      *
-     * @param   ?object  $decorated     Decorated object if you need to define it
+     * @param   TInner|null  $decorated     Decorated object if you need to define it
      *
      */
     public function __construct(?object $decorated = null)
