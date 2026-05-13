@@ -12,6 +12,7 @@ class CachedAutoStubService extends CacheDecorator {
 
     protected ?string $prefix_key = 'auto-svc';
 
+    #[\Override]
     protected function decoratedClass(): ?string
     {
         return StubService::class;

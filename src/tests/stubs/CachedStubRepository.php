@@ -13,6 +13,7 @@ class CachedStubRepository extends RepositoryCacheDecorator {
 
 	protected array $excludes = ['allWithoutCache', 'insert'];
 
+    #[\Override]
     protected function decoratedClass(): ?string
     {
         return StubRepository::class;

@@ -120,7 +120,7 @@ abstract class CacheDecorator {
                         'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache',
                         'isMethodCacheable', 'generateCacheKey', 'log', 'cacheMiss',         ];
 
-        $this->excludes = array_merge($defaults, (array) $this->excludes);
+        $this->excludes = array_merge($defaults, $this->excludes);
     }
 
     /**
@@ -336,7 +336,7 @@ abstract class CacheDecorator {
     {
         if (method_exists($this->decorated, $method)) {
             $this->log('Calling method from the decorated object');
-            return call_user_func_array([$this->decorated, $method], $arguments);
+            return $this->decorated->{$method}(...$arguments);
         }
 
         throw new BadMethodCallException("Method '{$method}' does not exist in the decorated object");
