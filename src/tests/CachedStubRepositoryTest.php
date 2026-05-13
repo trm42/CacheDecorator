@@ -189,12 +189,12 @@ class CachedStubRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function testSetTTLToFalse()
+    public function testSetTtlToNullSkipsCache()
     {
         Cache::shouldReceive('get')->never();
         Cache::shouldReceive('put')->never();
 
-        $this->repository->setTtl(false);
+        $this->repository->setTtl(null);
 
         $this->repository->find(3);
     }

@@ -206,7 +206,7 @@ The base class is now generic and the repository-specific glue has been removed 
 This release targets Laravel 12 and 13 on PHP 8.2+. A few breaking changes:
 
 - **TTL semantics changed from minutes to seconds** (matching Laravel 5.8+'s `Cache::put` API). Update any `$ttl` property and the `repository_cache.ttl` config value accordingly — e.g. `5` (minutes) becomes `300` (seconds).
-- `$ttl` may now also be a `DateInterval` or `DateTimeInterface`, in addition to `int` and `false` (which still bypasses the cache entirely).
+- `$ttl` may now also be a `DateInterval` or `DateTimeInterface`, in addition to `int` and `null` (which bypasses the cache entirely).
 - Minimum PHP version is 8.2.
 
 *Tested with Laravel 12 and Laravel 13.*

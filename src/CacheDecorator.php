@@ -44,8 +44,8 @@ abstract class CacheDecorator {
 
     protected object $decorated;
 
-    /** TTL in seconds (or DateInterval / DateTimeInterface). false bypasses both reads and writes. */
-    protected int|false|DateInterval|DateTimeInterface|null $ttl = null;
+    /** TTL in seconds (or DateInterval / DateTimeInterface). null bypasses both reads and writes. */
+    protected int|DateInterval|DateTimeInterface|null $ttl = null;
 
     /** Beginning of the cache key (e.g. 'users' for a user-related decorator). */
     protected ?string $prefix_key = null;
@@ -123,9 +123,9 @@ abstract class CacheDecorator {
     /**
      * Set Cache TTL
      *
-     * @param   int|false|DateInterval|DateTimeInterface|null   $ttl    Cache time-to-live in seconds, or false to skip cache.
+     * @param   int|DateInterval|DateTimeInterface|null   $ttl    Cache time-to-live in seconds, or null to skip cache.
      */
-    public function setTtl($ttl): void
+    public function setTtl(int|DateInterval|DateTimeInterface|null $ttl): void
     {
         $this->ttl = $ttl;
     }
@@ -272,14 +272,14 @@ abstract class CacheDecorator {
      *
      * @return  mixed   Results from the cache with or without tags, or the
      *                  cacheMiss() sentinel if the entry is absent (or reads
-     *                  are bypassed via ttl === false).
+     *                  are bypassed via ttl === null).
      *
      */
     protected function getCache(string $key)
     {
         $miss = $this->cacheMiss();
 
-        if ($this->ttl === false) {
+        if ($this->ttl === null) {
             return $miss;
         }
 
@@ -306,8 +306,8 @@ abstract class CacheDecorator {
      */
     protected function putCache(string $key, $res): bool
     {
-        if ($this->ttl === false) { // don't save if ttl is false
-            $this->log('Skipping saving to cache as TTL is set to false');
+        if ($this->ttl === null) { // don't save if ttl is null
+            $this->log('Skipping saving to cache as TTL is set to null');
             return false;
         }
 

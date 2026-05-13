@@ -84,12 +84,12 @@ class CachedStubServiceTest extends TestCase
     }
 
     #[Test]
-    public function testSetTTLToFalseBypassesCache()
+    public function testSetTtlToNullBypassesCache()
     {
         Cache::shouldReceive('get')->never();
         Cache::shouldReceive('put')->never();
 
-        $this->service->setTtl(false);
+        $this->service->setTtl(null);
 
         $this->service->compute(3);
     }
