@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Traits\ForwardsCalls;
 use LogicException;
 
 /**
@@ -42,6 +43,8 @@ use LogicException;
  */
 abstract class CacheDecorator
 {
+    use ForwardsCalls;
+
     /** @var TInner */
     protected object $decorated;
 
@@ -126,7 +129,8 @@ abstract class CacheDecorator
     {
         $defaults = ['decoratedClass', 'setTtl', 'setEnabled', 'getConfig', 'initDecorated',
             'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache',
-            'isMethodCacheable', 'generateCacheKey', 'log', 'cacheMiss',         ];
+            'isMethodCacheable', 'generateCacheKey', 'log', 'cacheMiss',
+            'forwardCallTo', 'forwardDecoratedCallTo', 'throwBadMethodCallException', ];
 
         $this->excludes = array_merge($defaults, $this->excludes);
     }
@@ -330,6 +334,14 @@ abstract class CacheDecorator
     /**
      * Method for making calls to the decorated object
      *
+     * Delegates through Laravel's ForwardsCalls trait so calls also reach
+     * methods the decorated object exposes via its own __call() magic, not just
+     * declared methods. When the inner method returns the inner object (a fluent
+     * `return $this;`), forwardDecoratedCallTo() returns this decorator instead,
+     * so chaining stays on the cached surface. A genuinely undefined method is
+     * converted to a BadMethodCallException reading
+     * "Call to undefined method {Decorator}::{method}()".
+     *
      * @param  string  $method  Name of the method
      * @param  array<int|string, mixed>  $arguments  Arguments for the method
      * @return mixed What ever the decorated method returns
@@ -338,13 +350,9 @@ abstract class CacheDecorator
      */
     protected function callMethod(string $method, array $arguments)
     {
-        if (method_exists($this->decorated, $method)) {
-            $this->log('Calling method from the decorated object');
+        $this->log('Calling method from the decorated object');
 
-            return $this->decorated->{$method}(...$arguments);
-        }
-
-        throw new BadMethodCallException("Method '{$method}' does not exist in the decorated object");
+        return $this->forwardDecoratedCallTo($this->decorated, $method, $arguments);
     }
 
     /**

@@ -64,7 +64,34 @@ $cached->dailyTotals('2026-05-12'); // cache miss → calls ReportingService::da
 $cached->dailyTotals('2026-05-12'); // cache hit  → returns the cached value
 ```
 
-The decorator forwards any method not listed in `$excludes` to the underlying object via `__call()` and caches the result. *The current version doesn't support objects as method arguments — coming in v1.0.0.*
+The decorator forwards any method not listed in `$excludes` to the underlying object via `__call()` and caches the result. Forwarding goes through Laravel's `ForwardsCalls` trait, so calls also reach methods the decorated object exposes through *its own* `__call()` magic — not just declared methods. Calling a method that exists nowhere on the decorated object throws `BadMethodCallException` with the message `Call to undefined method {Decorator}::{method}()`. *The current version doesn't support objects as method arguments — coming in v1.0.0.*
+
+### Fluent / self-returning methods
+
+`forwardDecoratedCallTo()` rewrites a fluent `return $this;` from the inner object back to the **decorator**, so method chaining stays on the cached surface instead of escaping to the bare inner instance.
+
+Two conventions make this transparent and type-safe:
+
+- **List fluent methods in `$excludes`.** They aren't cache candidates anyway, and excluding them keeps them on the always-forward path. (On a cache *miss* `__call()` stores `callMethod()`'s return — now the decorator instance — and a later *hit* would return that cached decorator directly, bypassing the rewrite. Excluding avoids caching a decorator object.)
+- **Type fluent methods `: static` behind a shared interface.** Have the inner class implement an interface whose fluent methods return `static`. A caller then sees the same type whether it holds the inner instance or the decorator, and the decorator standing in for `$this` on self-returning calls is type-coherent.
+
+```PHP
+interface ReportingContract {
+    public function forMonth(string $month): static; // fluent
+    public function totals(): array;                  // cacheable
+}
+
+class ReportingService implements ReportingContract { /* ... */ }
+
+/** @extends CacheDecorator<ReportingService> */
+class CachedReportingService extends CacheDecorator {
+    protected ?string $prefix_key = 'reports';
+    protected array $excludes = ['forMonth']; // fluent method stays on the forward path
+}
+
+$cached = new CachedReportingService(new ReportingService);
+$cached->forMonth('2026-05')->totals(); // forMonth() returns the decorator; totals() is cached
+```
 
 ### Optional: have the decorator instantiate the inner class for you
 
