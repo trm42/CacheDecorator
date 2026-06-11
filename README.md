@@ -85,6 +85,8 @@ class CachedReportingService extends CacheDecorator {
 $cached = new CachedReportingService;
 ```
 
+The FQCN returned by `decoratedClass()` is resolved through Laravel's service container (via `resolve()`), so the decorated class may declare constructor dependencies (they are auto-wired), and `decoratedClass()` may return an interface that's bound in the container.
+
 ### Custom caching logic for a single method
 
 If a particular method needs hand-tuned caching, override it in the subclass and use the protected helpers:

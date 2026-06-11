@@ -29,7 +29,7 @@ The package is intentionally small — four production files plus tests.
 - **Config** is read in `getConfig()` from `{$this->config_key}.*` (`ttl`, `enabled`, `use_tags`) plus `app.debug` for the `$debug` flag controlling `Log::debug` output. The base default is `'cache_decorator'`; `RepositoryCacheDecorator` overrides it to `'repository_cache'`.
 - **`src/ServiceProvider.php`** — publishes both config files: `config/cache_decorator.php` under the `cache-decorator-config` tag and `config/repository_cache.php` under the `repository-cache-config` tag; `register()` is empty. The provider is auto-discovered via `extra.laravel.providers` in `composer.json`.
 
-The classes use Laravel facades (`Cache`, `Config`, `Log` from `Illuminate\Support\Facades`), so this package is Laravel-coupled — the TODO in the header notes a future goal to decouple. When testing the no-arg construction path, the decorated class is instantiated via `new $class` inside `initDecorated()` unless an instance is injected through the constructor.
+The classes use Laravel facades (`Cache`, `Config`, `Log` from `Illuminate\Support\Facades`), so this package is Laravel-coupled — the TODO in the header notes a future goal to decouple. When testing the no-arg construction path, the decorated class is resolved through Laravel's service container via `resolve($class)` inside `initDecorated()` unless an instance is injected through the constructor. Because resolution goes through the container, the decorated class may declare auto-wired constructor dependencies and `decoratedClass()` may return a container-bound interface.
 
 ## Conventions
 

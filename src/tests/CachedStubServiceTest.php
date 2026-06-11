@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Trm42\CacheDecorator\ServiceProvider;
 use Trm42\CacheDecorator\Tests\Stubs\CachedAutoStubService;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubService;
+use Trm42\CacheDecorator\Tests\Stubs\CachedStubServiceWithDependency;
 use Trm42\CacheDecorator\Tests\Stubs\StubService;
 
 /**
@@ -103,6 +104,18 @@ class CachedStubServiceTest extends TestCase
         $result = $service->findThing(7);
 
         $this->assertEquals(['id' => 7, 'name' => 'thing-7'], $result);
+    }
+
+    #[Test]
+    public function test_decorated_class_is_resolved_through_container_with_dependencies()
+    {
+        // StubServiceWithDependency requires a StubCollaborator constructor
+        // argument, so `new $class` would fail. Resolving through the container
+        // auto-wires the dependency.
+        $service = new CachedStubServiceWithDependency;
+        $service->setTtl(300);
+
+        $this->assertEquals('hello from collaborator', $service->delegatedGreeting());
     }
 
     #[Test]
