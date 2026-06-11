@@ -93,9 +93,12 @@ abstract class CacheDecorator
     }
 
     /**
-     * Override to return the FQCN of the class to default-instantiate when no
-     * instance is passed to the constructor. Return null (the default) to
-     * require an instance via the constructor.
+     * Override to return the FQCN of the class to resolve when no instance is
+     * passed to the constructor. The FQCN is resolved through Laravel's service
+     * container via resolve(), so the decorated class may declare auto-wired
+     * constructor dependencies, and this may return an interface bound in the
+     * container. Return null (the default) to require an instance via the
+     * constructor.
      *
      * @return class-string<TInner>|null FQCN of the decorated class, or null
      */
@@ -182,7 +185,7 @@ abstract class CacheDecorator
                 );
             }
 
-            $decorated = new $class;
+            $decorated = resolve($class);
         }
 
         $this->decorated = $decorated;
