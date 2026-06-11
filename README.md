@@ -1,5 +1,9 @@
 # (Magical) Cache Decorator for Laravel
 
+[![Tests](https://github.com/trm42/CacheDecorator/actions/workflows/run-tests.yml/badge.svg)](https://github.com/trm42/CacheDecorator/actions/workflows/run-tests.yml)
+[![PHPStan](https://github.com/trm42/CacheDecorator/actions/workflows/phpstan.yml/badge.svg)](https://github.com/trm42/CacheDecorator/actions/workflows/phpstan.yml)
+[![Code style](https://github.com/trm42/CacheDecorator/actions/workflows/fix-php-code-style-issues.yml/badge.svg)](https://github.com/trm42/CacheDecorator/actions/workflows/fix-php-code-style-issues.yml)
+
 A transparent caching decorator for any Laravel-side class — services, API clients, query objects, repositories, you name it. Sub-class `CacheDecorator`, point it at the object you want to cache, and every public method call is automatically cached on first run and served from the cache on subsequent calls.
 
 Stop writing boilerplate like this for every class whose results you want to cache:
@@ -41,13 +45,15 @@ namespace My\Services;
 
 use Trm42\CacheDecorator\CacheDecorator;
 
+/** @extends CacheDecorator<ReportingService> */
 class CachedReportingService extends CacheDecorator {
 
-    protected $ttl = 300; // cache ttl in seconds (or a DateInterval / DateTimeInterface)
-    protected $prefix_key = 'reports';
-    protected $excludes = ['recompute']; // methods listed here are never cached
+    protected ?string $prefix_key = 'reports';
+    protected array $excludes = ['recompute']; // methods listed here are never cached
 }
 ```
+
+> **TTL is read from config**, not from a `$ttl` property. The constructor calls `getConfig()`, which overwrites `$ttl` from `cache_decorator.ttl` (default `300` seconds; `repository_cache.ttl` for `RepositoryCacheDecorator`). To override it per-instance, call `setTtl(...)` after construction (e.g. in your subclass constructor) — it accepts `int` seconds, a `DateInterval`, a `DateTimeInterface`, or `null` to bypass the cache entirely.
 
 …and use it like this:
 
@@ -65,9 +71,11 @@ The decorator forwards any method not listed in `$excludes` to the underlying ob
 If you don't want to wire the inner instance yourself, override `decoratedClass()` to return its FQCN and you can construct the decorator with no arguments:
 
 ```PHP
+/** @extends CacheDecorator<ReportingService> */
 class CachedReportingService extends CacheDecorator {
-    protected $prefix_key = 'reports';
+    protected ?string $prefix_key = 'reports';
 
+    #[\Override]
     protected function decoratedClass(): ?string
     {
         return ReportingService::class;
@@ -105,8 +113,8 @@ public function findByX($x)
 If your cache driver supports tags, declare which methods invalidate the tag bucket:
 
 ```PHP
-protected $tag_cleaners = ['recompute'];
-protected $tags = ['reports'];
+protected array $tag_cleaners = ['recompute'];
+protected array $tags = ['reports'];
 ```
 
 ## Using with repositories
@@ -118,14 +126,15 @@ namespace My\Repositories;
 
 use Trm42\CacheDecorator\RepositoryCacheDecorator;
 
+/** @extends RepositoryCacheDecorator<UserRepository> */
 class CachedUserRepository extends RepositoryCacheDecorator {
 
-    protected $ttl = 300;
-    protected $prefix_key = 'users';
-    protected $excludes = ['allWithoutCache'];
-    protected $tag_cleaners = ['create'];
-    protected $tags = ['users'];
+    protected ?string $prefix_key = 'users';
+    protected array $excludes = ['allWithoutCache'];
+    protected array $tag_cleaners = ['create'];
+    protected array $tags = ['users'];
 
+    #[\Override]
     protected function decoratedClass(): ?string
     {
         return UserRepository::class;
