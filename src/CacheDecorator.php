@@ -4,13 +4,16 @@ namespace Trm42\CacheDecorator;
 
 // At least for now there's a Laravel dependency, if there's need, this can be
 // converted to something more generic
+use BackedEnum;
 use DateInterval;
 use DateTimeInterface;
+use Illuminate\Contracts\Routing\UrlRoutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Traits\ForwardsCalls;
+use Stringable;
 use Trm42\CacheDecorator\Exceptions\MissingDecoratedObjectException;
 use Trm42\CacheDecorator\Exceptions\UndefinedMethodException;
 
@@ -39,7 +42,6 @@ use Trm42\CacheDecorator\Exceptions\UndefinedMethodException;
  * @todo    Add some kind of timer functionality to monitor result and cache speed
  * @todo    How to handle empty returns (maybe config whether to cache empty or not and the placeholder)
  * @todo    How to live without Laravel dependencies?
- * @todo    What if the decorated method parameters are objects? O___O
  */
 abstract class CacheDecorator
 {
@@ -127,32 +129,92 @@ abstract class CacheDecorator
      */
     protected function initExcludes(): void
     {
-        $defaults = ['decoratedClass', 'setTtl', 'setEnabled', 'getConfig', 'initDecorated',
+        $defaults = ['decoratedClass', 'getConfig', 'initDecorated',
             'doesMethodClearTag', 'clearCacheTag', 'getCache', 'putCache',
-            'isMethodCacheable', 'generateCacheKey', 'log', 'cacheMiss',
-            'forwardCallTo', 'forwardDecoratedCallTo', 'throwBadMethodCallException', ];
+            'isMethodCacheable', 'generateCacheKey', 'normalizeArgument', 'log', 'cacheMiss',
+            'forwardCallTo', 'forwardDecoratedCallTo', 'throwBadMethodCallException',
+            'ttl', 'enable', 'disable', 'prefix', 'withTags', 'tagCleaners', 'exclude', ];
 
         $this->excludes = array_merge($defaults, $this->excludes);
     }
 
     /**
-     * Set Cache TTL
+     * Set the cache TTL for this instance.
      *
      * @param  int|DateInterval|DateTimeInterface|null  $ttl  Cache time-to-live in seconds, or null to skip cache.
      */
-    public function setTtl(int|DateInterval|DateTimeInterface|null $ttl): void
+    public function ttl(int|DateInterval|DateTimeInterface|null $ttl): static
     {
         $this->ttl = $ttl;
+
+        return $this;
     }
 
     /**
-     * Enable or disable caching
-     *
-     * @param  bool  $bool  True == enable
+     * Turn caching on for this instance.
      */
-    public function setEnabled(bool $bool): void
+    public function enable(): static
     {
-        $this->enabled = $bool;
+        $this->enabled = true;
+
+        return $this;
+    }
+
+    /**
+     * Turn caching off for this instance (forwards straight to the decorated object).
+     */
+    public function disable(): static
+    {
+        $this->enabled = false;
+
+        return $this;
+    }
+
+    /**
+     * Set the cache key prefix at runtime.
+     */
+    public function prefix(?string $prefix): static
+    {
+        $this->prefix_key = $prefix;
+
+        return $this;
+    }
+
+    /**
+     * Set the cache tags applied to this decorator's entries. Requires a
+     * tag-capable cache store.
+     *
+     * @param  list<string>  $tags
+     */
+    public function withTags(array $tags): static
+    {
+        $this->tags = $tags;
+
+        return $this;
+    }
+
+    /**
+     * Set the methods that flush the cache tags after running. Requires a
+     * tag-capable cache store.
+     *
+     * @param  list<string>  $methods
+     */
+    public function tagCleaners(array $methods): static
+    {
+        $this->tag_cleaners = $methods;
+
+        return $this;
+    }
+
+    /**
+     * Append one or more method names to the excludes list so they are never
+     * cached (forwarded straight to the decorated object).
+     */
+    public function exclude(string ...$methods): static
+    {
+        $this->excludes = array_values([...$this->excludes, ...$methods]);
+
+        return $this;
     }
 
     /**
@@ -409,7 +471,7 @@ abstract class CacheDecorator
         $params = '';
 
         foreach ($temp_params as $k => $v) {
-            $params .= ".{$k}={$v}";
+            $params .= ".{$k}=".$this->normalizeArgument($v);
         }
 
         $key = "{$this->prefix_key}.{$method}{$params}";
@@ -417,6 +479,44 @@ abstract class CacheDecorator
         $this->log('Cache Key: \''.$key.'\'');
 
         return $key;
+    }
+
+    /**
+     * Normalize a single (already dotted) argument value into a stable string
+     * token for the cache key. Override this in a subclass to customize how a
+     * given argument type contributes to the key.
+     *
+     * Resolution order:
+     *  1. Scalars / null / bool  → cast as-is (keeps existing keys byte-identical).
+     *  2. UrlRoutable (Eloquent models, etc.) → getRouteKey() — natural, stable identity.
+     *  3. BackedEnum → its ->value; Stringable / __toString → string cast.
+     *  4. Anything else (plain objects, closures-as-data) → a bounded, stable
+     *     hash (json_encode when encodable, otherwise md5(serialize())).
+     *
+     * @param  mixed  $value  A leaf argument value to fold into the cache key
+     * @return string Stable string token representing the value
+     */
+    protected function normalizeArgument(mixed $value): string
+    {
+        if ($value === null || is_scalar($value)) {
+            return (string) $value;
+        }
+
+        if ($value instanceof UrlRoutable) {
+            return (string) $value->getRouteKey();
+        }
+
+        if ($value instanceof BackedEnum) {
+            return (string) $value->value;
+        }
+
+        if ($value instanceof Stringable || (is_object($value) && method_exists($value, '__toString'))) {
+            return (string) $value;
+        }
+
+        $json = json_encode($value);
+
+        return $json !== false ? $json : md5(serialize($value));
     }
 
     /**

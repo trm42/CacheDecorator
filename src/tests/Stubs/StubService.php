@@ -57,4 +57,11 @@ class StubService
 
         return false;
     }
+
+    public function describeModel(StubModel $model): string
+    {
+        $this->callCount++;
+
+        return "model-{$model->id}";
+    }
 }
