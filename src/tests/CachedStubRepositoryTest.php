@@ -5,6 +5,7 @@ namespace Trm42\CacheDecorator\Tests;
 use Illuminate\Support\Facades\Cache;
 use Orchestra\Testbench\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Trm42\CacheDecorator\Exceptions\UndefinedMethodException;
 use Trm42\CacheDecorator\ServiceProvider;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubRepository;
 use Trm42\CacheDecorator\Tests\Stubs\StubRepository;
@@ -129,7 +130,7 @@ class CachedStubRepositoryTest extends TestCase
     #[Test]
     public function test_missing_function()
     {
-        $this->expectException(\BadMethodCallException::class);
+        $this->expectException(UndefinedMethodException::class);
 
         $this->repository->foobar();
     }

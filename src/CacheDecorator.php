@@ -4,7 +4,6 @@ namespace Trm42\CacheDecorator;
 
 // At least for now there's a Laravel dependency, if there's need, this can be
 // converted to something more generic
-use BadMethodCallException;
 use DateInterval;
 use DateTimeInterface;
 use Illuminate\Support\Arr;
@@ -12,7 +11,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Traits\ForwardsCalls;
-use LogicException;
+use Trm42\CacheDecorator\Exceptions\MissingDecoratedObjectException;
+use Trm42\CacheDecorator\Exceptions\UndefinedMethodException;
 
 /**
  * Magical Cache Decorator class. Meant to be sub classed.
@@ -183,7 +183,7 @@ abstract class CacheDecorator
             $class = $this->decoratedClass();
 
             if (! $class) {
-                throw new LogicException(
+                throw new MissingDecoratedObjectException(
                     'No decorated object provided and decoratedClass() returned null. '
                     .'Either pass an instance to the constructor or override decoratedClass().'
                 );
@@ -339,20 +339,41 @@ abstract class CacheDecorator
      * declared methods. When the inner method returns the inner object (a fluent
      * `return $this;`), forwardDecoratedCallTo() returns this decorator instead,
      * so chaining stays on the cached surface. A genuinely undefined method is
-     * converted to a BadMethodCallException reading
+     * converted to an UndefinedMethodException reading
      * "Call to undefined method {Decorator}::{method}()".
      *
      * @param  string  $method  Name of the method
      * @param  array<int|string, mixed>  $arguments  Arguments for the method
      * @return mixed What ever the decorated method returns
      *
-     * @throws BadMethodCallException If the method doesn't exist on the decorated object
+     * @throws UndefinedMethodException If the method doesn't exist on the decorated object
      */
     protected function callMethod(string $method, array $arguments)
     {
         $this->log('Calling method from the decorated object');
 
         return $this->forwardDecoratedCallTo($this->decorated, $method, $arguments);
+    }
+
+    /**
+     * Throw a package-specific exception for an undefined forwarded method.
+     *
+     * Overrides the ForwardsCalls trait helper so that calls to methods missing
+     * on the decorated object surface as an UndefinedMethodException (a
+     * CacheDecoratorException) instead of a raw BadMethodCallException. The
+     * message is kept identical to the trait's so behavior other than the
+     * thrown type is unchanged.
+     *
+     * @param  string  $method  Name of the undefined method
+     * @return never
+     *
+     * @throws UndefinedMethodException
+     */
+    protected static function throwBadMethodCallException($method)
+    {
+        throw new UndefinedMethodException(sprintf(
+            'Call to undefined method %s::%s()', static::class, $method
+        ));
     }
 
     /**
