@@ -10,16 +10,13 @@
          cacheDirectory=".phpunit.cache">
     <testsuites>
         <testsuite name="CacheDecorator">
-            <directory>./src/tests</directory>
+            <directory>./tests</directory>
         </testsuite>
     </testsuites>
     <source>
         <include>
             <directory suffix=".php">./src</directory>
         </include>
-        <exclude>
-            <directory>./src/tests</directory>
-        </exclude>
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>

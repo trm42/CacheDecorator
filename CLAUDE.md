@@ -10,10 +10,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Install deps: `composer install`
 - Run tests: `composer test` or `vendor/bin/phpunit`
-- Run a single test file: `vendor/bin/phpunit src/tests/CachedStubRepositoryTest.php`
-- Run a single test method: `vendor/bin/phpunit --filter testMethodName src/tests/CachedStubRepositoryTest.php`
+- Run a single test file: `vendor/bin/phpunit tests/CachedStubRepositoryTest.php`
+- Run a single test method: `vendor/bin/phpunit --filter testMethodName tests/CachedStubRepositoryTest.php`
 
-PHPUnit ^11 is used (PHPUnit 12 also allowed); test bootstrap is `vendor/autoload.php`, and the suite lives under `src/tests/` (configured in `phpunit.xml`). The Laravel-integrating tests rely on Orchestra Testbench to boot a minimal Laravel app, register `Trm42\CacheDecorator\ServiceProvider`, and supply the `Cache` / `Config` facades.
+PHPUnit ^11 is used (PHPUnit 12 also allowed); test bootstrap is `vendor/autoload.php`, and the suite lives under `tests/` (configured in `phpunit.xml`). The Laravel-integrating tests rely on Orchestra Testbench to boot a minimal Laravel app, register `Trm42\CacheDecorator\ServiceProvider`, and supply the `Cache` / `Config` facades.
 
 ## Architecture
 
@@ -38,4 +38,4 @@ The classes use Laravel facades (`Cache`, `Config`, `Log` from `Illuminate\Suppo
 - Inside custom method overrides, reference the inner object as `$this->decorated`.
 - To customize caching for a single method, override it in the subclass and use the protected helpers `generateCacheKey()`, `getCache()`, `putCache()` (see README example).
 - TTL values throughout (subclass `$ttl`, `cache_decorator.ttl` / `repository_cache.ttl` config, calls to `ttl()`) are in seconds — this changed from "minutes" when upgrading from the Laravel 5.x line.
-- **Keep the README in sync.** Any `src/` change that affects the main classes (`CacheDecorator`, `RepositoryCacheDecorator`, `ServiceProvider`) and their public-facing surface — property types/signatures, subclassing conventions, config keys, the `__call` flow, or anything a user copy-pastes from a usage example — must be documented in `README.md` as part of the same change. This is a core part of the package's DX and ease of use: the README usage examples should compile and run cleanly against the current code and follow the same conventions as the test stubs under `src/tests/Stubs/`.
+- **Keep the README in sync.** Any `src/` change that affects the main classes (`CacheDecorator`, `RepositoryCacheDecorator`, `ServiceProvider`) and their public-facing surface — property types/signatures, subclassing conventions, config keys, the `__call` flow, or anything a user copy-pastes from a usage example — must be documented in `README.md` as part of the same change. This is a core part of the package's DX and ease of use: the README usage examples should compile and run cleanly against the current code and follow the same conventions as the test stubs under `tests/Stubs/`.
