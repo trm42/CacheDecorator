@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Cache;
 use Orchestra\Testbench\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
+use Trm42\CacheDecorator\Exceptions\MissingDecoratedObjectException;
+use Trm42\CacheDecorator\Exceptions\UndefinedMethodException;
 use Trm42\CacheDecorator\ServiceProvider;
 use Trm42\CacheDecorator\Tests\Stubs\CachedAutoStubService;
 use Trm42\CacheDecorator\Tests\Stubs\CachedFluentService;
@@ -83,7 +85,7 @@ class CachedStubServiceTest extends TestCase
     #[Test]
     public function test_missing_method_throws()
     {
-        $this->expectException(\BadMethodCallException::class);
+        $this->expectException(UndefinedMethodException::class);
 
         $this->service->doesNotExist();
     }
@@ -125,7 +127,7 @@ class CachedStubServiceTest extends TestCase
     #[Test]
     public function test_constructor_without_instance_or_decorated_class_throws()
     {
-        $this->expectException(\LogicException::class);
+        $this->expectException(MissingDecoratedObjectException::class);
 
         new CachedStubService;
     }

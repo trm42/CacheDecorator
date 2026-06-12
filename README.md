@@ -64,7 +64,7 @@ $cached->dailyTotals('2026-05-12'); // cache miss → calls ReportingService::da
 $cached->dailyTotals('2026-05-12'); // cache hit  → returns the cached value
 ```
 
-The decorator forwards any method not listed in `$excludes` to the underlying object via `__call()` and caches the result. Forwarding goes through Laravel's `ForwardsCalls` trait, so calls also reach methods the decorated object exposes through *its own* `__call()` magic — not just declared methods. Calling a method that exists nowhere on the decorated object throws `BadMethodCallException` with the message `Call to undefined method {Decorator}::{method}()`. *The current version doesn't support objects as method arguments — coming in v1.0.0.*
+The decorator forwards any method not listed in `$excludes` to the underlying object via `__call()` and caches the result. Forwarding goes through Laravel's `ForwardsCalls` trait, so calls also reach methods the decorated object exposes through *its own* `__call()` magic — not just declared methods. Calling a method that exists nowhere on the decorated object throws `UndefinedMethodException` (see [Exceptions](#exceptions)) with the message `Call to undefined method {Decorator}::{method}()`. *The current version doesn't support objects as method arguments — coming in v1.0.0.*
 
 ### Fluent / self-returning methods
 
@@ -145,6 +145,29 @@ If your cache driver supports tags, declare which methods invalidate the tag buc
 protected array $tag_cleaners = ['recompute'];
 protected array $tags = ['reports'];
 ```
+
+## Exceptions
+
+All errors thrown by the package live in the `Trm42\CacheDecorator\Exceptions` namespace and extend a single abstract base, `CacheDecoratorException`. Catch that base type to handle any cache-decorator-specific failure in one place, or catch a concrete subclass to distinguish the failure mode:
+
+| Exception                          | Thrown when                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `CacheDecoratorException`          | *(abstract base — never thrown directly; catch it to handle every error below)*                               |
+| `MissingDecoratedObjectException`  | No instance was passed to the constructor **and** `decoratedClass()` returned `null`, so there is nothing to wrap. |
+| `UndefinedMethodException`         | A forwarded call targets a method that exists nowhere on the decorated object.                                |
+
+```PHP
+use Trm42\CacheDecorator\Exceptions\CacheDecoratorException;
+
+try {
+    $cached->dailyTotals('2026-05-12');
+} catch (CacheDecoratorException $e) {
+    // catches MissingDecoratedObjectException and UndefinedMethodException alike
+    report($e);
+}
+```
+
+> **Breaking change.** These types previously surfaced as the SPL exceptions `LogicException` (missing decorated object) and `BadMethodCallException` (undefined method). They now extend `\Exception` via `CacheDecoratorException` and are **not** instances of those SPL classes — update any `catch (LogicException ...)` / `catch (BadMethodCallException ...)` blocks that relied on the old types.
 
 ## Using with repositories
 
