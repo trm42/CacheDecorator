@@ -8,8 +8,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Trm42\CacheDecorator\ServiceProvider;
 use Trm42\CacheDecorator\Tests\Stubs\CachedAutoStubService;
+use Trm42\CacheDecorator\Tests\Stubs\CachedFluentService;
+use Trm42\CacheDecorator\Tests\Stubs\CachedMagicService;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubService;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubServiceWithDependency;
+use Trm42\CacheDecorator\Tests\Stubs\StubFluentService;
+use Trm42\CacheDecorator\Tests\Stubs\StubMagicService;
 use Trm42\CacheDecorator\Tests\Stubs\StubService;
 
 /**
@@ -159,5 +163,39 @@ class CachedStubServiceTest extends TestCase
             $this->inner->callCount,
             "Falsy return from {$method}() should round-trip via cache instead of re-invoking the inner service"
         );
+    }
+
+    #[Test]
+    public function test_magic_method_is_forwarded_and_cached()
+    {
+        $magicInner = new StubMagicService;
+        $service = new CachedMagicService($magicInner);
+        $service->setEnabled(true);
+        $service->setTtl(300);
+
+        // magicCompute() only exists via StubMagicService::__call(), so the old
+        // method_exists() gate would have thrown BadMethodCallException.
+        $first = $service->magicCompute(4);
+        $second = $service->magicCompute(4);
+
+        $this->assertEquals(12, $first);
+        $this->assertEquals(12, $second);
+        $this->assertEquals(1, $magicInner->callCount, 'Second call should hit cache, not the inner __call()');
+    }
+
+    #[Test]
+    public function test_fluent_method_returns_decorator_not_inner()
+    {
+        $fluentInner = new StubFluentService;
+        $service = new CachedFluentService($fluentInner);
+        $service->setEnabled(true);
+        $service->setTtl(300);
+
+        // withFlag() returns `$this` (the inner); forwardDecoratedCallTo()
+        // rewrites that to the decorator so chaining stays on the cached surface.
+        $returned = $service->withFlag(true);
+
+        $this->assertSame($service, $returned, 'Fluent call should return the decorator, not the inner object');
+        $this->assertEquals('on', $returned->result());
     }
 }
