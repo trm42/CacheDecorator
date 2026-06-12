@@ -40,8 +40,8 @@ class CachedStubRepositoryTest extends TestCase
         Cache::flush();
 
         $this->repository = new CachedStubRepository(new StubRepository);
-        $this->repository->setEnabled(true);
-        $this->repository->setTtl(300);
+        $this->repository->enable();
+        $this->repository->ttl(300);
     }
 
     #[Test]
@@ -175,7 +175,7 @@ class CachedStubRepositoryTest extends TestCase
     #[Test]
     public function test_set_enabled_false_bypasses_cache()
     {
-        $this->repository->setEnabled(false);
+        $this->repository->disable();
 
         $first = $this->repository->all();
         $this->assertEquals([1, 2, 3, 4, 5], $first);
@@ -194,7 +194,7 @@ class CachedStubRepositoryTest extends TestCase
         Cache::shouldReceive('get')->never();
         Cache::shouldReceive('put')->never();
 
-        $this->repository->setTtl(null);
+        $this->repository->ttl(null);
 
         $this->repository->find(3);
     }

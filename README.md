@@ -53,7 +53,7 @@ class CachedReportingService extends CacheDecorator {
 }
 ```
 
-> **TTL is read from config**, not from a `$ttl` property. The constructor calls `getConfig()`, which overwrites `$ttl` from `cache_decorator.ttl` (default `300` seconds; `repository_cache.ttl` for `RepositoryCacheDecorator`). To override it per-instance, call `setTtl(...)` after construction (e.g. in your subclass constructor) — it accepts `int` seconds, a `DateInterval`, a `DateTimeInterface`, or `null` to bypass the cache entirely.
+> **TTL is read from config**, not from a `$ttl` property. The constructor calls `getConfig()`, which overwrites `$ttl` from `cache_decorator.ttl` (default `300` seconds; `repository_cache.ttl` for `RepositoryCacheDecorator`). To override it per-instance, call `->ttl(...)` after construction (e.g. in your subclass constructor) — it accepts `int` seconds, a `DateInterval`, a `DateTimeInterface`, or `null` to bypass the cache entirely. See [Fluent configuration](#fluent-configuration) for the full chainable grammar.
 
 …and use it like this:
 
@@ -64,7 +64,52 @@ $cached->dailyTotals('2026-05-12'); // cache miss → calls ReportingService::da
 $cached->dailyTotals('2026-05-12'); // cache hit  → returns the cached value
 ```
 
-The decorator forwards any method not listed in `$excludes` to the underlying object via `__call()` and caches the result. Forwarding goes through Laravel's `ForwardsCalls` trait, so calls also reach methods the decorated object exposes through *its own* `__call()` magic — not just declared methods. Calling a method that exists nowhere on the decorated object throws `UndefinedMethodException` (see [Exceptions](#exceptions)) with the message `Call to undefined method {Decorator}::{method}()`. *The current version doesn't support objects as method arguments — coming in v1.0.0.*
+The decorator forwards any method not listed in `$excludes` to the underlying object via `__call()` and caches the result. Forwarding goes through Laravel's `ForwardsCalls` trait, so calls also reach methods the decorated object exposes through *its own* `__call()` magic — not just declared methods. Calling a method that exists nowhere on the decorated object throws `UndefinedMethodException` (see [Exceptions](#exceptions)) with the message `Call to undefined method {Decorator}::{method}()`. Method arguments may be scalars, arrays, or objects — see [Object arguments in cache keys](#object-arguments-in-cache-keys).
+
+### Fluent configuration
+
+Every configuration setter is chainable (returns the decorator) and there's an expressive, self-documenting grammar for tuning an instance at runtime — no subclass property edits required:
+
+```PHP
+$cached = (new CachedReportingService(new ReportingService))
+    ->ttl(600)                 // TTL in seconds (also DateInterval / DateTimeInterface / null)
+    ->prefix('reports')        // cache-key prefix
+    ->withTags(['reports'])    // cache tags (tag-capable store)
+    ->tagCleaners(['recompute']) // methods that flush the tags after running
+    ->exclude('debugDump');    // never cache these methods
+
+$cached->totals(); // configured and cached
+```
+
+| Method | Returns | Behavior |
+|---|---|---|
+| `ttl($ttl)` | `static` | Set TTL (seconds / `DateInterval` / `DateTimeInterface` / `null` to bypass). |
+| `enable()` | `static` | Turn caching on. |
+| `disable()` | `static` | Turn caching off (forwards straight to the inner object). |
+| `prefix(?string)` | `static` | Set the cache-key prefix. |
+| `withTags(array)` | `static` | Set the cache tags. |
+| `tagCleaners(array)` | `static` | Set the methods that flush the tags. |
+| `exclude(string ...)` | `static` | Append method names to the never-cache list. |
+
+> If you add your own public methods to a `CacheDecorator` **subclass**, remember that any method *not* listed in `$excludes` is forwarded to the inner object by `__call()`. The fluent methods above are already excluded by the base class, so chaining always resolves on the decorator and never leaks to the inner instance.
+
+### Object arguments in cache keys
+
+Method arguments may be scalars, arrays, or **objects** — the decorator folds each argument into the cache key through a stable identity rule:
+
+1. **Scalars / `null` / `bool`** — cast as-is (existing scalar-only keys are byte-identical, so upgrading invalidates nothing).
+2. **`UrlRoutable`** (Eloquent models, etc.) — uses `getRouteKey()`, the model's natural stable identity. Two distinct instances with the same route key share a cache entry.
+3. **`BackedEnum`** — uses its `->value`; **`Stringable` / `__toString`** — string-cast.
+4. **Anything else** (plain objects, nested arrays of objects) — a bounded, stable hash (`json_encode`, falling back to `md5(serialize(...))`).
+
+Arrays are flattened (`Arr::dot`) and each leaf runs through the same rule, so nested objects are handled too.
+
+```PHP
+$cached->reportFor($user);              // User implements UrlRoutable → keyed by getRouteKey()
+$cached->reportFor($sameUserReloaded);  // same route key → cache hit
+```
+
+To customize how a given argument type contributes to the key, override the protected `normalizeArgument(mixed $value): string` seam in your subclass — it sits alongside `generateCacheKey()`, `getCache()`, and `putCache()` as a first-class extension point.
 
 ### Fluent / self-returning methods
 
@@ -242,10 +287,11 @@ Environment variables:
 
 A few breaking changes tightened the public contract:
 
-- **TTL bypass uses `null`, not `false`.** The "skip the cache" sentinel for `$ttl` is now `null`. The property type is `int|DateInterval|DateTimeInterface|null` (default `null`) and `setTtl()` has the same typed signature — replace any `protected $ttl = false;` with `protected $ttl = null;` and any `setTtl(false)` with `setTtl(null)`.
+- **TTL bypass uses `null`, not `false`.** The "skip the cache" sentinel for `$ttl` is now `null`. The property type is `int|DateInterval|DateTimeInterface|null` (default `null`) and `ttl()` has the same typed signature — replace any `protected $ttl = false;` with `protected $ttl = null;` and any `ttl(false)` with `ttl(null)`.
+- **The `void` setters were dropped for a fluent grammar.** `setTtl()` / `setEnabled(bool)` have been removed in favor of the chainable `ttl()`, `enable()`, and `disable()` methods (see [Fluent configuration](#fluent-configuration)). Replace `setTtl($n)` with `ttl($n)`, `setEnabled(true)` with `enable()`, and `setEnabled(false)` with `disable()`.
 - **`$tags` and `$tag_cleaners` are plain arrays.** Both default to `[]` (no longer `array|false`). If the cache driver doesn't support tags (or `use_tags` is disabled in config), they are reset to `[]` rather than `false`. Custom subclasses that initialized either property to `false` should switch to `[]`.
 - **Falsy cached values round-trip correctly.** Previously a method returning `0`, `''`, `[]`, or `false` would look like a cache miss and be refetched on every call. `getCache()` now returns a `cacheMiss()` sentinel (a shared `stdClass`) on a true miss, and `__call()` compares with `===` — so falsy results are cached and served from cache as expected. If you wrote a custom method override with `if (!$res)` around `getCache()`, switch it to `if ($res === $this->cacheMiss())` (see the override example above).
-- **The `enabled` flag now actually short-circuits caching.** Setting `$enabled = false` (via the property, `setEnabled(false)`, or `{$config_key}.enabled = false`) now causes `__call()` to forward straight to the decorated object, skipping cache reads, writes, and tag flushing.
+- **The `enabled` flag now actually short-circuits caching.** Setting `$enabled = false` (via the property, `disable()`, or `{$config_key}.enabled = false`) now causes `__call()` to forward straight to the decorated object, skipping cache reads, writes, and tag flushing.
 
 ### From the repository-only version
 

@@ -16,6 +16,7 @@ use Trm42\CacheDecorator\Tests\Stubs\CachedStubService;
 use Trm42\CacheDecorator\Tests\Stubs\CachedStubServiceWithDependency;
 use Trm42\CacheDecorator\Tests\Stubs\StubFluentService;
 use Trm42\CacheDecorator\Tests\Stubs\StubMagicService;
+use Trm42\CacheDecorator\Tests\Stubs\StubModel;
 use Trm42\CacheDecorator\Tests\Stubs\StubService;
 
 /**
@@ -48,8 +49,8 @@ class CachedStubServiceTest extends TestCase
 
         $this->inner = new StubService;
         $this->service = new CachedStubService($this->inner);
-        $this->service->setEnabled(true);
-        $this->service->setTtl(300);
+        $this->service->enable();
+        $this->service->ttl(300);
     }
 
     #[Test]
@@ -96,7 +97,7 @@ class CachedStubServiceTest extends TestCase
         Cache::shouldReceive('get')->never();
         Cache::shouldReceive('put')->never();
 
-        $this->service->setTtl(null);
+        $this->service->ttl(null);
 
         $this->service->compute(3);
     }
@@ -105,7 +106,7 @@ class CachedStubServiceTest extends TestCase
     public function test_no_arg_construction_via_decorated_class()
     {
         $service = new CachedAutoStubService;
-        $service->setTtl(300);
+        $service->ttl(300);
 
         $result = $service->findThing(7);
 
@@ -119,7 +120,7 @@ class CachedStubServiceTest extends TestCase
         // argument, so `new $class` would fail. Resolving through the container
         // auto-wires the dependency.
         $service = new CachedStubServiceWithDependency;
-        $service->setTtl(300);
+        $service->ttl(300);
 
         $this->assertEquals('hello from collaborator', $service->delegatedGreeting());
     }
@@ -172,8 +173,8 @@ class CachedStubServiceTest extends TestCase
     {
         $magicInner = new StubMagicService;
         $service = new CachedMagicService($magicInner);
-        $service->setEnabled(true);
-        $service->setTtl(300);
+        $service->enable();
+        $service->ttl(300);
 
         // magicCompute() only exists via StubMagicService::__call(), so the old
         // method_exists() gate would have thrown BadMethodCallException.
@@ -190,8 +191,8 @@ class CachedStubServiceTest extends TestCase
     {
         $fluentInner = new StubFluentService;
         $service = new CachedFluentService($fluentInner);
-        $service->setEnabled(true);
-        $service->setTtl(300);
+        $service->enable();
+        $service->ttl(300);
 
         // withFlag() returns `$this` (the inner); forwardDecoratedCallTo()
         // rewrites that to the decorator so chaining stays on the cached surface.
@@ -199,5 +200,102 @@ class CachedStubServiceTest extends TestCase
 
         $this->assertSame($service, $returned, 'Fluent call should return the decorator, not the inner object');
         $this->assertEquals('on', $returned->result());
+    }
+
+    #[Test]
+    public function test_fluent_setters_return_the_decorator()
+    {
+        $this->assertSame($this->service, $this->service->ttl(600));
+        $this->assertSame($this->service, $this->service->enable());
+        $this->assertSame($this->service, $this->service->disable());
+        $this->assertSame($this->service, $this->service->prefix('svc'));
+        $this->assertSame($this->service, $this->service->withTags(['x']));
+        $this->assertSame($this->service, $this->service->tagCleaners(['mutate']));
+        $this->assertSame($this->service, $this->service->exclude('whatever'));
+    }
+
+    #[Test]
+    public function test_disable_bypasses_cache()
+    {
+        $this->service->disable();
+
+        $this->service->compute(21);
+        $this->service->compute(21);
+
+        $this->assertEquals(2, $this->inner->callCount, 'disable() should bypass the cache');
+    }
+
+    #[Test]
+    public function test_enable_turns_caching_back_on()
+    {
+        $this->service->disable()->enable();
+
+        $this->service->compute(21);
+        $this->service->compute(21);
+
+        $this->assertEquals(1, $this->inner->callCount, 'enable() should restore caching');
+    }
+
+    #[Test]
+    public function test_fluent_ttl_null_bypasses_cache()
+    {
+        Cache::shouldReceive('get')->never();
+        Cache::shouldReceive('put')->never();
+
+        $this->service->ttl(null);
+
+        $this->service->compute(3);
+    }
+
+    #[Test]
+    public function test_fluent_exclude_adds_method_to_excludes()
+    {
+        $this->service->exclude('compute');
+
+        $this->service->compute(21);
+        $this->service->compute(21);
+
+        $this->assertEquals(2, $this->inner->callCount, 'exclude() should keep compute() off the cache path');
+    }
+
+    #[Test]
+    public function test_chained_configuration_resolves_on_decorator_not_inner()
+    {
+        // Regression guard for the initExcludes() additions: each fluent method
+        // must run on the decorator and return it, not be forwarded to the inner.
+        $result = $this->service->ttl(600)->enable()->prefix('svc')->compute(21);
+
+        $this->assertEquals(42, $result);
+    }
+
+    #[Test]
+    public function test_object_argument_caches_by_identity()
+    {
+        $model = new StubModel(7);
+
+        $first = $this->service->describeModel($model);
+        $second = $this->service->describeModel($model);
+
+        $this->assertEquals('model-7', $first);
+        $this->assertEquals('model-7', $second);
+        $this->assertEquals(1, $this->inner->callCount, 'Same UrlRoutable identity should hit the cache');
+    }
+
+    #[Test]
+    public function test_object_arguments_with_same_route_key_share_cache()
+    {
+        $this->service->describeModel(new StubModel(7));
+        $this->service->describeModel(new StubModel(7));
+
+        $this->assertEquals(1, $this->inner->callCount, 'Distinct instances with the same getRouteKey() should share a cache entry');
+    }
+
+    #[Test]
+    public function test_object_arguments_with_distinct_identity_yield_distinct_keys()
+    {
+        $this->service->describeModel(new StubModel(7));
+        $this->service->describeModel(new StubModel(8));
+
+        $this->assertEquals(2, $this->inner->callCount, 'Different identities should produce different cache keys');
     }
 }
